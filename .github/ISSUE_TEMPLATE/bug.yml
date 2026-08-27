@@ -1,0 +1,32 @@
+name: Defect report
+description: Report a reproducible VAO CLI error or incorrect result.
+title: "[Defect] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not report security vulnerabilities here; use private vulnerability reporting.
+  - type: input
+    id: version
+    attributes:
+      label: VAO CLI and VAO Standard versions
+      placeholder: VAO CLI 0.2.0 / VAO Standard 0.4.0
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction and observed result
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include operating system, Python version, command, and relevant non-sensitive diagnostics.

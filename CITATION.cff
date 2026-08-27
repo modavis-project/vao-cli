@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use VAO CLI, cite this software and the VAO 0.4.0 standard."
+title: "VAO CLI"
+type: software
+version: "0.2.0"
+date-released: "2026-08-27"
+doi: "10.5281/zenodo.22133810"
+authors:
+  - family-names: Ukolov
+    given-names: Dominik
+    orcid: "https://orcid.org/0000-0002-7904-3892"
+    affiliation: "Digital Humanities (Image/Object), Friedrich Schiller University Jena; Research Group DIGITAL ORGANOLOGY, Leipzig University"
+repository-code: "https://github.com/modavis-project/vao-cli"
+url: "https://modavis-project.github.io/vao-cli/"
+license: Apache-2.0
+keywords:
+  - virtual acoustic object
+  - digital preservation
+  - research data
+  - acoustics
+  - Zenodo
+abstract: >-
+  VAO CLI is a reference command-line client for resolving, inspecting,
+  validating, and selectively acquiring Virtual Acoustic Objects conforming
+  to the VAO 0.4.0 standard.
+references:
+  - type: software
+    title: "Virtual Acoustic Object (VAO) Standard"
+    version: "0.4.0"
+    doi: "10.5281/zenodo.22122774"
+    authors:
+      - family-names: Ukolov
+        given-names: Dominik

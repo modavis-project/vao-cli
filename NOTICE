@@ -1,0 +1,10 @@
+VAO CLI
+Copyright 2026 Dominik Ukolov and contributors.
+
+VAO CLI implements parts of the Virtual Acoustic Object (VAO) Standard. The
+standard is a separate work and is available at
+https://doi.org/10.5281/zenodo.22122774.
+
+VAO and MODAVIS refer to project names and identifiers. Third-party names,
+services, and marks remain the property of their respective owners. Their
+mention does not imply endorsement.

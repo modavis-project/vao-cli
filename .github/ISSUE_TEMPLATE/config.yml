@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/modavis-project/vao-cli/security/advisories/new
+    about: Report parser, extraction, materialization, or network vulnerabilities privately.
+  - name: VAO Standard issue
+    url: https://github.com/modavis-project/vao-standard/issues
+    about: Report normative format questions or contradictions in the standard repository.

@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+_vendor/
+/_site/
+/docs/_site/
+/docs/.jekyll-cache/
+.DS_Store
+*.partial
+*.sqlite3

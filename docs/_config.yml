@@ -1,0 +1,26 @@
+title: VAO CLI
+description: Reference resolution, validation, and selective acquisition for Virtual Acoustic Objects.
+theme: minima
+lang: en
+baseurl: /vao-cli
+url: https://modavis-project.github.io
+repository: modavis-project/vao-cli
+permalink: pretty
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+relative_links:
+  enabled: true
+  collections: false
+header_pages:
+  - getting-started.md
+  - command-reference.md
+  - ARCHITECTURE.md
+  - compatibility.md
+  - resolver-api.md
+  - security.md
+  - publication-preparation.md
+exclude:
+  - Gemfile
+  - Gemfile.lock

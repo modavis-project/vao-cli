@@ -1,0 +1,63 @@
+name: Prepare VAO CLI 0.2.0 release
+
+on:
+  push:
+    tags:
+      - "v0.2.0"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml
+
+  draft-release:
+    name: Prepare draft GitHub release
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require the exact signed release ref
+        run: |
+          test "$GITHUB_REF" = "refs/tags/v0.2.0"
+          test "$(git cat-file -t refs/tags/v0.2.0)" = "tag"
+          printf '%s\n' 'modavis-project@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC0hRn2syRAD3vCm9MLm766FprDF3GfVMVmj5C2wYPkk' > "$RUNNER_TEMP/vao-cli-allowed-signers"
+          git -c gpg.ssh.allowedSignersFile="$RUNNER_TEMP/vao-cli-allowed-signers" verify-tag refs/tags/v0.2.0
+          VAO_CLI_RELEASE_COMMIT="$(git rev-list -n 1 refs/tags/v0.2.0)"
+          test "$VAO_CLI_RELEASE_COMMIT" = "$GITHUB_SHA"
+          git -c gpg.ssh.allowedSignersFile="$RUNNER_TEMP/vao-cli-allowed-signers" verify-commit "$VAO_CLI_RELEASE_COMMIT"
+          test "$(git show -s --format=%ae "$VAO_CLI_RELEASE_COMMIT")" = "modavis-project@users.noreply.github.com"
+          test "$(tr -d '\n' < VERSION)" = "0.2.0"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Build and check distributions
+        run: |
+          python -m pip install --disable-pip-version-check --require-hashes -r requirements-lock.txt
+          python -m build --no-isolation --outdir "$RUNNER_TEMP/vao-cli-dist"
+          python -m twine check "$RUNNER_TEMP"/vao-cli-dist/*
+          cd "$RUNNER_TEMP/vao-cli-dist"
+          sha256sum vao_cli-0.2.0-py3-none-any.whl vao_cli-0.2.0.tar.gz > SHA256SUMS
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.2.0 --json isDraft --jq .isDraft > "$RUNNER_TEMP/release-is-draft" 2>/dev/null; then
+            test "$(cat "$RUNNER_TEMP/release-is-draft")" = "true"
+            gh release upload v0.2.0 "$RUNNER_TEMP"/vao-cli-dist/* --clobber
+          else
+            gh release create v0.2.0 "$RUNNER_TEMP"/vao-cli-dist/* \
+              --draft \
+              --verify-tag \
+              --title "VAO CLI 0.2.0" \
+              --notes-file .github/release-notes-0.2.0.md
+          fi
+
+      # Deliberately no PyPI upload and no GitHub Release publication step.

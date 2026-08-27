@@ -1,0 +1,16 @@
+include AUTHORS.md
+include CHANGELOG.md
+include CITATION.cff
+include CODE_OF_CONDUCT.md
+include CONTRIBUTING.md
+include LICENSE
+include NOTICE
+include SECURITY.md
+include SUPPORT.md
+include VERSION
+include codemeta.json
+include requirements-lock.txt
+recursive-include docs *
+recursive-include tests *.py
+recursive-include tools *.py
+prune docs/_site

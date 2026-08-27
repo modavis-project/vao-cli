@@ -1,0 +1,39 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "VAO CLI",
+  "identifier": "https://doi.org/10.5281/zenodo.22133810",
+  "version": "0.2.0",
+  "datePublished": "2026-08-27",
+  "description": "Reference command-line client for resolving, validating, and selectively acquiring Virtual Acoustic Objects.",
+  "codeRepository": "https://github.com/modavis-project/vao-cli",
+  "downloadUrl": "https://github.com/modavis-project/vao-cli/releases/tag/v0.2.0",
+  "issueTracker": "https://github.com/modavis-project/vao-cli/issues",
+  "license": "https://spdx.org/licenses/Apache-2.0",
+  "programmingLanguage": "Python",
+  "runtimePlatform": "Python 3.11 or newer",
+  "author": {
+    "@type": "Person",
+    "givenName": "Dominik",
+    "familyName": "Ukolov",
+    "@id": "https://orcid.org/0000-0002-7904-3892",
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Digital Humanities (Image/Object), Friedrich Schiller University Jena",
+        "@id": "https://ror.org/05qpz1x62"
+      },
+      {
+        "@type": "Organization",
+        "name": "Research Group DIGITAL ORGANOLOGY, Leipzig University",
+        "@id": "https://ror.org/03s7gtk40"
+      }
+    ]
+  },
+  "isBasedOn": {
+    "@type": "CreativeWork",
+    "name": "Virtual Acoustic Object (VAO) Standard",
+    "version": "0.4.0",
+    "identifier": "https://doi.org/10.5281/zenodo.22122774"
+  }
+}

@@ -1,0 +1,23 @@
+name: Improvement proposal
+description: Propose an interoperable VAO CLI capability or workflow improvement.
+title: "[Proposal] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and users
+    validations:
+      required: true
+  - type: textarea
+    id: standard
+    attributes:
+      label: Relevant VAO mechanism or conformance role
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Proposed outcome and compatibility impact
+    validations:
+      required: true
