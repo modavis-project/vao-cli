@@ -1,7 +1,7 @@
 ---
 layout: page
 title: Publication preparation
-description: The local, non-publishing workflow for reviewing a VAO 0.4.0 Zenodo record package.
+description: The local, non-publishing workflow for reviewing a VAO 0.5 two-carrier Zenodo record package.
 permalink: /publication-preparation/
 ---
 
@@ -9,16 +9,21 @@ permalink: /publication-preparation/
 Zenodo and cannot create, upload, modify, submit, publish, or delete a record.
 
 ```sh
-vao publication prepare object.vao \
+vao publication prepare object-bootstrap.vao object-preservation.vao \
+  --readme reviewed-record-guide.pdf \
   --output publication-review --copy-carrier
 ```
 
-The command requires the input carrier to pass both bounded local checks and the
-released VAO 0.4.0 reference validator. It then creates:
+For VAO 0.5, the command requires one `bootstrap` carrier and one
+`preservation-closure` carrier. Both must embed byte-identical manifests and pass local
+integrity checks plus the VAO 0.5 reference validator. The older one-input VAO 0.4 path
+remains available. The command then creates:
 
 ```text
 publication-review/
-├── object.vao                       optional copied carrier
+├── object-bootstrap.vao             optional copied carrier
+├── object-preservation.vao          optional copied carrier
+├── README.pdf                       optional reviewed record guide
 ├── vao-manifest.json                exact carrier manifest bytes
 ├── vao-release.template.json        schema-valid repository descriptor template
 ├── zenodo-metadata.template.json    schema-valid legacy projection for review
@@ -27,31 +32,42 @@ publication-review/
 ```
 
 The release and metadata templates deliberately contain pending repository identity and
-restricted-access review values. Their schemas are validated, but the metadata template
-targets the legacy Zenodo Depositions compatibility profile defined by VAO 0.4.0. It is
-not asserted to be a complete request for Zenodo's current InvenioRDM Records API or a
-substitute for reviewing the web form.
+restricted-access review values. Their schemas are validated. The metadata document is
+a review projection, not a substitute for checking Zenodo's current web form and
+rendered draft.
 
 ## Recommended record shape
 
-A single-carrier record normally exposes:
+A VAO 0.5 Zenodo record has one semantic release and two transport carriers:
 
 ```text
-object.vao
+object-bootstrap.vao
+object-preservation.vao
 vao-manifest.json
 vao-release.json
-README.md                     optional human documentation
+README.pdf
+SHA256SUMS
 ```
 
-The standalone manifest supports inexpensive capability discovery and is an exact byte
-copy of the carrier manifest. `vao-release.json` binds the exact version record and file
-inventory after the repository identifiers exist. Concept DOIs support discovery;
-acquisition bindings use exact version, record, file, byte-size, and digest identity.
+The bootstrap is the start-here carrier: it contains the complete semantic manifest and
+only the compact evidence needed for inspection. The preservation closure embeds every
+realization. Both carriers contain the exact same manifest bytes. The standalone
+manifest makes capability discovery cheap, while `vao-release.json` binds the exact
+version record, carrier IDs, descriptors, file sizes, and hashes after the repository
+identifiers exist. Concept DOIs support discovery; acquisition uses the exact version
+DOI, record, file, carrier, member, byte extent, and digest identity.
 
-Modular records use the VAO 0.4.0 repository and `pack-member` distribution model rather
-than a second resolver manifest. Every family member retains exact release, record,
-file, member, extent, and digest bindings. A small complete bootstrap group remains
-valuable for resilient inspection and use.
+No separate mobile, production, or preservation records are needed. Those are semantic
+realizations inside the same manifest. `vao fetch` can range-retrieve one embedded
+member from either carrier, and `vao materialize` can combine any selected subset into a
+custom local carrier. This keeps the public record fixed and comprehensible while the
+user's local carrier remains purpose-built.
+
+Only these six public files belong at the record root. Measurements, MIDI signal maps,
+source workbooks, normalized tables, methods, and acknowledgments belong inside the VAO
+as typed realizations and evidence; they are not unpredictable sibling downloads. If a
+non-VAO supplementary archive is scientifically necessary, it must be explicitly
+documented and inventoried rather than added ad hoc.
 
 ## Readiness boundary
 
@@ -61,6 +77,8 @@ requires review of:
 - creators, contributors, ORCID/ROR identifiers, funding, and subjects;
 - rights, licenses, consent, privacy, access, and culturally sensitive material;
 - exact Zenodo version and concept identifiers and the final file inventory;
+- exact carrier IDs, descriptor hashes, manifest hashes, and `carrier-member`
+  distribution targets;
 - the current Zenodo metadata model and rendered record preview;
 - remote resolution, conformance inspection, selective acquisition, full download, and
   moderated-community submission.

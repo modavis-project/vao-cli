@@ -20,10 +20,11 @@ from .vao import MANIFEST_NAME
 
 
 def prepare_publication(
-    carrier_path: Path,
+    carrier_path: Path | list[Path],
     destination: Path,
     *,
     copy_carrier: bool = False,
+    readme: Path | None = None,
     standard_root: Path | None = None,
 ) -> dict[str, Any]:
     if destination.exists() and (
@@ -32,32 +33,71 @@ def prepare_publication(
         raise ResolutionError(
             f"Publication staging directory is not empty: {destination}"
         )
-    report = validate_local_carrier(carrier_path, verify_payloads=True)
-    if not report["valid"]:
-        raise IntegrityError("Carrier is invalid: " + "; ".join(report["errors"][:8]))
-    manifest = report["manifest"]
-    if not isinstance(manifest, dict) or manifest.get("formatVersion") != "0.4.0":
-        raise IntegrityError("Publication preparation requires a VAO 0.4.0 carrier")
-    reference = run_reference_validator(
-        carrier_path, standard_root=standard_root, required=True
-    )
-    if not reference["valid"]:
-        raise IntegrityError(
-            "Carrier failed reference validation: "
-            + (reference["stderr"] or reference["stdout"])
+    carriers = [carrier_path] if isinstance(carrier_path, Path) else carrier_path
+    if not carriers:
+        raise ResolutionError("Publication preparation requires at least one carrier")
+    prepared: list[tuple[Path, dict[str, Any], dict[str, Any]]] = []
+    manifest_raw: bytes | None = None
+    for path in carriers:
+        report = validate_local_carrier(path, verify_payloads=True)
+        if not report["valid"]:
+            raise IntegrityError(
+                f"Carrier {path} is invalid: " + "; ".join(report["errors"][:8])
+            )
+        manifest = report["manifest"]
+        if not isinstance(manifest, dict) or manifest.get("formatVersion") not in {
+            "0.4.0",
+            "0.5.0",
+        }:
+            raise IntegrityError("Publication preparation requires VAO 0.4 or 0.5")
+        with zipfile.ZipFile(path) as archive:
+            raw = archive.read(MANIFEST_NAME)
+        if manifest_raw is None:
+            manifest_raw = raw
+        elif raw != manifest_raw:
+            raise IntegrityError(
+                "Publication carriers do not embed identical manifests"
+            )
+        reference = run_reference_validator(
+            path, standard_root=standard_root, required=True
         )
+        if not reference["valid"]:
+            raise IntegrityError(
+                f"Carrier {path} failed reference validation: "
+                + (reference["stderr"] or reference["stdout"])
+            )
+        prepared.append((path, report, reference))
+    assert manifest_raw is not None
+    manifest = prepared[0][1]["manifest"]
+    version = str(manifest["formatVersion"])
+    if any(item[1]["manifest"]["formatVersion"] != version for item in prepared):
+        raise IntegrityError("Publication carriers use different VAO versions")
+    modes = [str(item[1]["carrier"].get("carrierMode")) for item in prepared]
+    if len(modes) != len(set(modes)):
+        raise IntegrityError("Publication carrier modes must be unique")
+    if version == "0.5.0" and set(modes) != {
+        "bootstrap",
+        "preservation-closure",
+    }:
+        raise IntegrityError(
+            "The VAO 0.5 Zenodo profile requires one bootstrap and one preservation-closure carrier"
+        )
+    if version == "0.4.0" and len(prepared) != 1:
+        raise IntegrityError("The legacy VAO 0.4 staging path accepts one carrier")
+    if readme is not None and (not readme.is_file() or readme.suffix.lower() != ".pdf"):
+        raise ResolutionError("--readme must name an existing PDF file")
     destination.parent.mkdir(parents=True, exist_ok=True)
     work = Path(
         tempfile.mkdtemp(prefix=f".{destination.name}.", dir=destination.parent)
     )
     try:
         result = _prepare_publication_files(
-            carrier_path,
+            prepared,
+            manifest_raw,
             destination,
             work,
-            report,
-            reference,
             copy_carrier=copy_carrier,
+            readme=readme,
             standard_root=standard_root,
         )
         if destination.exists():
@@ -69,50 +109,86 @@ def prepare_publication(
 
 
 def _prepare_publication_files(
-    carrier_path: Path,
+    prepared: list[tuple[Path, dict[str, Any], dict[str, Any]]],
+    manifest_raw: bytes,
     destination: Path,
     work: Path,
-    report: dict[str, Any],
-    reference: dict[str, Any],
     *,
     copy_carrier: bool,
+    readme: Path | None,
     standard_root: Path | None,
 ) -> dict[str, Any]:
-    manifest = report["manifest"]
-    with zipfile.ZipFile(carrier_path) as archive:
-        manifest_raw = archive.read(MANIFEST_NAME)
+    manifest = prepared[0][1]["manifest"]
+    version = str(manifest["formatVersion"])
     standalone = work / MANIFEST_NAME
     standalone.write_bytes(manifest_raw)
-    carrier_target = work / carrier_path.name
-    if copy_carrier:
-        shutil.copy2(carrier_path, carrier_target)
-        carrier_reference = carrier_target.name
-    else:
-        carrier_reference = str(carrier_path.resolve())
     manifest_sha = hashlib.sha256(manifest_raw).hexdigest()
-    carrier_sha = _sha256_file(carrier_path)
-    carrier_record = {
-        "fileIdentifier": carrier_path.name,
-        "source": carrier_reference,
-        "role": "carrier",
-        "byteSize": carrier_path.stat().st_size,
-        "sha256": carrier_sha,
-    }
-    embedded_ids = [
-        item.get("realizationId")
-        for item in report["carrier"].get("embeddedRealizations", [])
-        if isinstance(item, dict) and item.get("realizationId")
-    ]
-    if embedded_ids:
-        carrier_record["realizationIds"] = embedded_ids
+    carrier_records: list[dict[str, Any]] = []
+    carrier_hashes: dict[str, str] = {}
+    for path, report, _reference in prepared:
+        target = work / path.name
+        if copy_carrier:
+            shutil.copy2(path, target)
+            source = str(destination / path.name)
+        else:
+            source = str(path.resolve())
+        with zipfile.ZipFile(path) as archive:
+            descriptor_raw = archive.read("META-INF/vao-carrier.json")
+        carrier = report["carrier"]
+        record: dict[str, Any] = {
+            "fileIdentifier": path.name,
+            "source": source,
+            "role": "carrier",
+            "byteSize": path.stat().st_size,
+            "sha256": _sha256_file(path),
+        }
+        if version == "0.5.0":
+            record.update(
+                {
+                    "carrierId": carrier["id"],
+                    "carrierMode": carrier["carrierMode"],
+                    "manifestSHA256": carrier["manifestSHA256"],
+                    "manifestByteSize": carrier["manifestByteSize"],
+                    "carrierDescriptorSHA256": hashlib.sha256(
+                        descriptor_raw
+                    ).hexdigest(),
+                    "carrierDescriptorByteSize": len(descriptor_raw),
+                    "completeGroupIds": carrier.get("completeGroupIds", []),
+                }
+            )
+        else:
+            embedded_ids = [
+                item.get("realizationId")
+                for item in carrier.get("embeddedRealizations", [])
+                if isinstance(item, dict) and item.get("realizationId")
+            ]
+            if embedded_ids:
+                record["realizationIds"] = embedded_ids
+        carrier_records.append(record)
+        carrier_hashes[path.name] = str(record["sha256"])
     manifest_record = _file_record(MANIFEST_NAME, standalone, "manifest")
     manifest_record["source"] = str(destination / MANIFEST_NAME)
-    upload_files = [manifest_record, carrier_record]
+    upload_files = [manifest_record, *carrier_records]
+    if readme is not None:
+        readme_target = work / "README.pdf"
+        shutil.copy2(readme, readme_target)
+        readme_record = _file_record("README.pdf", readme_target, "documentation")
+        readme_record["source"] = str(destination / "README.pdf")
+        upload_files.append(readme_record)
+    checksum_lines = [
+        f"{item['sha256']}  {item['fileIdentifier']}"
+        for item in sorted(upload_files, key=lambda value: str(value["fileIdentifier"]))
+    ]
+    checksums_path = work / "SHA256SUMS"
+    checksums_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
+    checksums_record = _file_record("SHA256SUMS", checksums_path, "checksum")
+    checksums_record["source"] = str(destination / "SHA256SUMS")
+    upload_files.append(checksums_record)
     release = manifest["release"]
     release_template = {
-        "$schema": "https://w3id.org/modavis/vao/0.4.0/schema/release.json",
+        "$schema": f"https://w3id.org/modavis/vao/{version}/schema/release.json",
         "type": "VAORelease",
-        "formatVersion": "0.4.0",
+        "formatVersion": version,
         "vaoId": manifest["id"],
         "releaseId": release["id"],
         "revision": release["revision"],
@@ -134,9 +210,7 @@ def _prepare_publication_files(
             "familyMembers": [],
         },
     }
-    metadata_template = _zenodo_metadata(manifest)
-    checksums = f"{manifest_sha}  {MANIFEST_NAME}\n{carrier_sha}  {carrier_path.name}\n"
-    (work / "SHA256SUMS").write_text(checksums, encoding="utf-8")
+    metadata_template = _zenodo_metadata(manifest, version)
     _write_json(work / "vao-release.template.json", release_template)
     _write_json(work / "zenodo-metadata.template.json", metadata_template)
     descriptor_conformance = {
@@ -160,21 +234,30 @@ def _prepare_publication_files(
     ]
     if invalid_descriptors:
         raise IntegrityError(
-            "Generated publication templates failed VAO 0.4.0 validation: "
+            f"Generated publication templates failed VAO {version} validation: "
             + ", ".join(invalid_descriptors)
         )
     readiness = {
         "readyForLivePublication": False,
         "reason": "Zenodo version/concept DOI and record identity are intentionally pending.",
         "carrierValid": True,
-        "referenceConformance": reference,
+        "referenceConformance": {
+            path.name: reference for path, _report, reference in prepared
+        },
         "descriptorConformance": descriptor_conformance,
         "manifestSHA256": manifest_sha,
-        "carrierSHA256": carrier_sha,
-        "verifiedPayloadBytes": report["verifiedPayloadBytes"],
+        "carrierSHA256": next(iter(carrier_hashes.values()))
+        if len(carrier_hashes) == 1
+        else None,
+        "carrierSHA256s": carrier_hashes,
+        "verifiedPayloadBytes": sum(
+            int(report["verifiedPayloadBytes"])
+            for _path, report, _reference in prepared
+        ),
         "requiredBeforeUpload": [
-            "Review creators/contributors, rights, consent/privacy, funding, subjects, and related identifiers.",
+            "Review creators/contributors, rights, consent/privacy, funding, subjects, acknowledgments, and related identifiers.",
             "Reserve or create the Zenodo draft and replace every PENDING identity.",
+            "Ensure carrier-member distributions use the reserved version DOI, record ID, file name, and carrier ID.",
             "Regenerate and validate vao-release.json against the exact record/file inventory.",
             "Perform remote resolve, inspect, selective fetch, full download, and community-submission tests.",
         ],
@@ -184,7 +267,7 @@ def _prepare_publication_files(
     return {"destination": str(destination), **readiness}
 
 
-def _zenodo_metadata(manifest: dict[str, Any]) -> dict[str, Any]:
+def _zenodo_metadata(manifest: dict[str, Any], version: str) -> dict[str, Any]:
     scientific = manifest.get("scientific", {})
     agents = {
         item.get("id"): item
@@ -206,7 +289,7 @@ def _zenodo_metadata(manifest: dict[str, Any]) -> dict[str, Any]:
     description = manifest.get("description", {})
     keywords = [
         "Virtual Acoustic Object",
-        "VAO 0.4",
+        f"VAO {version.removesuffix('.0')}",
         *[
             str(item.get("subject"))
             for item in discovery.get("subjects", [])
@@ -221,9 +304,9 @@ def _zenodo_metadata(manifest: dict[str, Any]) -> dict[str, Any]:
         if fallback not in keywords:
             keywords.append(fallback)
     return {
-        "$schema": "https://w3id.org/modavis/vao/0.4.0/schema/zenodo-metadata.json",
+        "$schema": f"https://w3id.org/modavis/vao/{version}/schema/zenodo-metadata.json",
         "type": "VAOZenodoMetadata",
-        "formatVersion": "0.4.0",
+        "formatVersion": version,
         "targetAPIProfile": "https://developers.zenodo.org/#deposition-metadata",
         "releaseId": manifest["release"]["id"],
         "publicationRecordId": "urn:vao:publication:pending-root-record",

@@ -16,13 +16,14 @@ from .local import (
     validate_standard_descriptor_schema,
 )
 from .models import RemoteFile
+from .release import find_carrier_record, select_carrier_file
 from .remote_zip import RemoteZipEntry, RemoteZipReader
-from .resolver import VAOResolver
 from .selection import SelectionConstraints, choose_one
 from .vao import (
     CARRIER_NAME,
     MANIFEST_NAME,
     MIMETYPE,
+    RELEASE_NAME,
     basic_manifest_errors,
     strict_json,
     verify_carrier_binding,
@@ -56,12 +57,20 @@ def fetch_realization(
     resolved = client.resolve(doi, allow_concept=allow_concept)
     client = client.for_resolved(resolved)
     files = client.files(resolved.record)
-    candidates = [item for item in files if item.key.lower().endswith(".vao")]
-    archive = VAOResolver._select_file(candidates, file_key)
-    if archive is None:
-        raise ResolutionError(
-            f"Zenodo record contains {len(candidates)} VAO carriers; select exactly one with --file"
-        )
+    release_file = next((item for item in files if item.key == RELEASE_NAME), None)
+    release_raw = (
+        client.http.get_cached_bytes(release_file.content_url, maximum=16 * 1024 * 1024)
+        if release_file
+        else None
+    )
+    release_descriptor = (
+        strict_json(release_raw, RELEASE_NAME, maximum=16 * 1024 * 1024)
+        if release_raw is not None
+        else None
+    )
+    archive = select_carrier_file(
+        files, release_descriptor, file_key=file_key, mode="bootstrap"
+    )
     reader = RemoteZipReader(client.http, archive.content_url, archive.size)
     if reader.read(reader.require_entry("mimetype"), maximum=256) != MIMETYPE:
         raise IntegrityError(f"{archive.key!r} is not a VAO carrier")
@@ -75,20 +84,25 @@ def fetch_realization(
             "Remote VAO manifest failed basic validation: " + "; ".join(errors[:8])
         )
     conformance_report: dict[str, Any] | None = None
+    release_conformance: dict[str, Any] | None = None
     if conformance:
-        if manifest.get("formatVersion") != "0.4.0":
-            raise UnsupportedError(
-                "Full reference conformance is available only for VAO 0.4.0; "
-                "use --no-conformance only for explicitly limited legacy processing"
-            )
         conformance_report = run_reference_manifest_validator(
             manifest_raw, standard_root=standard_root, required=True
         )
         if not conformance_report["valid"]:
             raise IntegrityError(
-                "Remote manifest failed full VAO 0.4.0 conformance: "
+                f"Remote manifest failed full VAO {manifest.get('formatVersion')} conformance: "
                 + (conformance_report["stderr"] or conformance_report["stdout"])
             )
+        if release_raw is not None:
+            release_conformance = run_reference_descriptor_bytes(
+                "release", release_raw, standard_root=standard_root, required=True
+            )
+            if not release_conformance["valid"]:
+                raise IntegrityError(
+                    f"Release descriptor failed full VAO {manifest.get('formatVersion')} conformance: "
+                    + (release_conformance["stderr"] or release_conformance["stdout"])
+                )
     carrier_raw = reader.read(
         reader.require_entry(CARRIER_NAME), maximum=64 * 1024 * 1024
     )
@@ -100,7 +114,7 @@ def fetch_realization(
         )
         if not carrier_conformance["valid"]:
             raise IntegrityError(
-                "Remote carrier descriptor failed the VAO 0.4.0 schema: "
+                f"Remote carrier descriptor failed the VAO {manifest.get('formatVersion')} schema: "
                 + "; ".join(carrier_conformance["errors"][:8])
             )
     verify_carrier_binding(manifest_raw, manifest, carrier)
@@ -126,8 +140,10 @@ def fetch_realization(
         archive,
         reader,
         manifest,
+        manifest_raw,
         carrier,
         realization,
+        release_descriptor=release_descriptor,
         conformance=conformance,
         standard_root=standard_root,
     )
@@ -145,6 +161,7 @@ def fetch_realization(
             "dryRun": dry_run,
             "manifestConformance": conformance_report,
             "carrierConformance": carrier_conformance,
+            "releaseConformance": release_conformance,
         }
     )
     selected_chunks = _select_chunks(realization, chunks) if chunks else None
@@ -211,9 +228,16 @@ def fetch_realization(
     public["verification"] = {
         "requestedBytes": "verified",
         "realization": "partial" if selected_chunks else "verified",
-        "outerPack": "not-fully-read"
-        if plan.get("delivery") == "pack-member"
-        else None,
+        **(
+            {"outerPack": "not-fully-read"}
+            if plan.get("delivery") == "pack-member"
+            else {}
+        ),
+        **(
+            {"outerCarrier": "not-fully-read"}
+            if plan.get("delivery") == "carrier-member"
+            else {}
+        ),
     }
     return public
 
@@ -224,9 +248,11 @@ def _locate_realization(
     archive: RemoteFile,
     reader: RemoteZipReader,
     manifest: dict[str, Any],
+    manifest_raw: bytes,
     carrier: dict[str, Any],
     realization: dict[str, Any],
     *,
+    release_descriptor: dict[str, Any] | None,
     conformance: bool,
     standard_root: Path | None,
 ) -> dict[str, Any]:
@@ -270,6 +296,21 @@ def _locate_realization(
                 reader,
                 manifest,
                 carrier,
+                distribution,
+                realization,
+                conformance=conformance,
+                standard_root=standard_root,
+            )
+        if distribution.get("kind") == "carrier-member":
+            if release_descriptor is None:
+                raise ResolutionError(
+                    "Carrier-member acquisition requires vao-release.json in the repository record"
+                )
+            return _carrier_member_plan(
+                client,
+                release_descriptor,
+                manifest,
+                manifest_raw,
                 distribution,
                 realization,
                 conformance=conformance,
@@ -360,6 +401,152 @@ def _repository_plan(
         "distributionDOI": resolved.resolved_doi,
         "_client": distribution_client,
     }
+
+
+def _carrier_member_plan(
+    client: ZenodoClient,
+    release: dict[str, Any],
+    manifest: dict[str, Any],
+    manifest_raw: bytes,
+    distribution: dict[str, Any],
+    realization: dict[str, Any],
+    *,
+    conformance: bool,
+    standard_root: Path | None,
+) -> dict[str, Any]:
+    if distribution.get("access") != "public":
+        raise ResolutionError(
+            f"Carrier-member distribution {distribution.get('id')!r} is not public"
+        )
+    persistent = distribution.get("persistentIdentifier")
+    carrier_id = distribution.get("carrierId")
+    file_key = distribution.get("fileIdentifier")
+    record_identifier = str(distribution.get("recordIdentifier"))
+    if not all(
+        isinstance(item, str) and item for item in (persistent, carrier_id, file_key)
+    ):
+        raise IntegrityError("Carrier-member distribution lacks exact target identity")
+
+    bindings = {
+        item.get("id"): item
+        for item in manifest.get("repositoryBindings", [])
+        if isinstance(item, dict)
+    }
+    binding = bindings.get(distribution.get("repositoryBindingId"))
+    if not isinstance(binding, dict):
+        raise IntegrityError("Carrier-member distribution has no repository binding")
+    if (
+        binding.get("repositoryType")
+        != "https://w3id.org/modavis/vao/repository/zenodo"
+    ):
+        raise UnsupportedError("Only Zenodo carrier-member distributions are supported")
+    if binding.get("resolutionPolicy") != "version-pid-record-file":
+        raise IntegrityError("Repository binding does not require exact resolution")
+    if (
+        binding.get("apiProfile")
+        != "https://w3id.org/modavis/vao/repository/zenodo/records-api/1"
+    ):
+        raise UnsupportedError(
+            "The repository binding does not use the supported Zenodo Records API profile"
+        )
+
+    resolved = client.resolve(str(persistent), allow_concept=False)
+    target_client = client.for_resolved(resolved)
+    if binding.get("instance") != resolved.instance.identity:
+        raise IntegrityError(
+            "Repository binding instance disagrees with the target DOI"
+        )
+    if str(resolved.record_id) != record_identifier:
+        raise IntegrityError("Carrier-member recordIdentifier disagrees with Zenodo")
+    _record, inventory = find_carrier_record(
+        release,
+        carrier_id=str(carrier_id),
+        version_pid=str(persistent),
+        record_identifier=record_identifier,
+        file_identifier=str(file_key),
+    )
+    matches = [
+        item for item in target_client.files(resolved.record) if item.key == file_key
+    ]
+    if len(matches) != 1:
+        raise ResolutionError(
+            f"Carrier file {file_key!r} does not resolve exactly once"
+        )
+    remote = matches[0]
+    if remote.size != inventory.get("byteSize"):
+        raise IntegrityError("Repository carrier size disagrees with vao-release.json")
+
+    reader = RemoteZipReader(target_client.http, remote.content_url, remote.size)
+    if reader.read(reader.require_entry("mimetype"), maximum=256) != MIMETYPE:
+        raise IntegrityError(f"{file_key!r} is not a VAO carrier")
+    target_manifest_raw = reader.read(
+        reader.require_entry(MANIFEST_NAME), maximum=64 * 1024 * 1024
+    )
+    if target_manifest_raw != manifest_raw:
+        raise IntegrityError(
+            "Target carrier does not embed the exact bootstrap manifest"
+        )
+    carrier_raw = reader.read(
+        reader.require_entry(CARRIER_NAME), maximum=16 * 1024 * 1024
+    )
+    if len(carrier_raw) != inventory.get("carrierDescriptorByteSize") or hashlib.sha256(
+        carrier_raw
+    ).hexdigest() != inventory.get("carrierDescriptorSHA256"):
+        raise IntegrityError(
+            "Target carrier descriptor disagrees with vao-release.json"
+        )
+    carrier = strict_json(carrier_raw, f"{file_key}:{CARRIER_NAME}")
+    if conformance:
+        carrier_report = validate_standard_descriptor_schema(
+            "carrier", carrier_raw, standard_root=standard_root, required=True
+        )
+        if not carrier_report["valid"]:
+            raise IntegrityError(
+                "Target carrier descriptor failed VAO conformance: "
+                + "; ".join(carrier_report["errors"][:8])
+            )
+    verify_carrier_binding(target_manifest_raw, manifest, carrier)
+    comparisons = {
+        "id": inventory.get("carrierId"),
+        "carrierMode": inventory.get("carrierMode"),
+        "manifestSHA256": inventory.get("manifestSHA256"),
+        "manifestByteSize": inventory.get("manifestByteSize"),
+        "completeGroupIds": inventory.get("completeGroupIds"),
+    }
+    for field, expected in comparisons.items():
+        if carrier.get(field) != expected:
+            raise IntegrityError(
+                f"Target carrier descriptor {field} disagrees with vao-release.json"
+            )
+    mappings = _mappings(carrier, str(realization["id"]))
+    if len(mappings) != 1 or not isinstance(mappings[0].get("path"), str):
+        raise IntegrityError(
+            "Target carrier does not map the requested realization exactly once"
+        )
+    member = str(mappings[0]["path"])
+    entry = reader.require_entry(member)
+    if entry.uncompressed_size != realization.get("byteSize"):
+        raise IntegrityError("Carrier member size disagrees with the realization")
+    plan = _zip_plan(
+        remote.content_url,
+        str(carrier_id),
+        member,
+        entry,
+        reader.data_offset(entry),
+        "carrier-member",
+    )
+    plan.update(
+        {
+            "distributionId": distribution.get("id"),
+            "distributionDOI": resolved.resolved_doi,
+            "carrierFile": remote.key,
+            "carrierByteSize": remote.size,
+            "carrierSHA256": inventory.get("sha256"),
+            "carrierDescriptorSHA256": inventory.get("carrierDescriptorSHA256"),
+            "_client": target_client,
+        }
+    )
+    return plan
 
 
 def _pack_plan(
@@ -564,8 +751,11 @@ def _validate_pack_manifest(
     raw: bytes, *, conformance: bool, standard_root: Path | None
 ) -> dict[str, Any]:
     value = strict_json(raw, "VAO pack manifest")
-    if value.get("type") != "VAOPackManifest" or value.get("formatVersion") != "0.4.0":
-        raise IntegrityError("Pack manifest is not VAO 0.4.0")
+    if value.get("type") != "VAOPackManifest" or value.get("formatVersion") not in {
+        "0.4.0",
+        "0.5.0",
+    }:
+        raise IntegrityError("Pack manifest is not a supported VAO version")
     if value.get("rejectUnlistedMembers") is not True or not isinstance(
         value.get("members"), list
     ):
@@ -576,7 +766,7 @@ def _validate_pack_manifest(
         )
         if not report["valid"]:
             raise IntegrityError(
-                "Pack manifest failed full VAO 0.4.0 conformance: "
+                f"Pack manifest failed full VAO {value.get('formatVersion')} conformance: "
                 + (report["stderr"] or report["stdout"])
             )
     return value

@@ -13,7 +13,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-from . import VAO_STANDARD_VERSION
+from . import VAO_STANDARD_VERSION, VAO_STANDARD_VERSIONS
 from .errors import ConfigurationError, IntegrityError, ResolutionError
 from .vao import (
     CARRIER_NAME,
@@ -195,10 +195,10 @@ def validate_local_carrier(
                 errors.append("Carrier and manifest formatVersion values disagree")
             if carrier.get("type") != "VAOCarrier":
                 errors.append("Carrier descriptor has an incorrect type")
-            if manifest.get("formatVersion") == VAO_STANDARD_VERSION and carrier.get(
+            if manifest.get("formatVersion") in VAO_STANDARD_VERSIONS and carrier.get(
                 "carrierMode"
             ) not in {"bootstrap", "custom", "preservation-closure"}:
-                errors.append("Carrier descriptor has an invalid VAO 0.4.0 carrierMode")
+                errors.append("Carrier descriptor has an invalid carrierMode")
             try:
                 verify_carrier_binding(manifest_raw, manifest, carrier)
             except IntegrityError as exc:
@@ -365,12 +365,17 @@ def extract_local_realization(
     }
 
 
-def find_vao_standard_root(explicit: Path | None = None) -> Path | None:
+def find_vao_standard_root(
+    explicit: Path | None = None, *, version: str = VAO_STANDARD_VERSION
+) -> Path | None:
+    tool = _tool_name(version)
     for candidate in _root_candidates(explicit, ("VAO_STANDARD_ROOT",)):
         if (
-            (candidate / "Tools" / "vao04.py").is_file()
-            and (candidate / "Schemas" / "vao-manifest-0.4.0.schema.json").is_file()
-            and _standard_version(candidate) == VAO_STANDARD_VERSION
+            (candidate / "Tools" / tool).is_file()
+            and (
+                candidate / "Schemas" / f"vao-manifest-{version}.schema.json"
+            ).is_file()
+            and _standard_version(candidate) in VAO_STANDARD_VERSIONS
         ):
             return candidate
     return None
@@ -408,16 +413,53 @@ def _standard_version(root: Path) -> str | None:
         return None
 
 
-def ensure_reference_validator(standard_root: Path | None = None) -> Path:
-    root = find_vao_standard_root(standard_root)
+def _tool_name(version: str) -> str:
+    if version == "0.4.0":
+        return "vao04.py"
+    if version == "0.5.0":
+        return "vao05.py"
+    raise ConfigurationError(f"No reference validator is available for VAO {version}")
+
+
+def _document_version(raw: bytes, label: str) -> str:
+    value = strict_json(raw, label, maximum=MAX_MANIFEST_BYTES)
+    version = value.get("formatVersion")
+    if version not in VAO_STANDARD_VERSIONS:
+        raise ConfigurationError(
+            f"No reference validator is available for VAO {version!r}"
+        )
+    return str(version)
+
+
+def _path_version(path: Path) -> str:
+    try:
+        if path.suffix.lower() == ".json":
+            return _document_version(path.read_bytes(), str(path))
+        with zipfile.ZipFile(path) as archive:
+            return _document_version(
+                _read_bounded(
+                    archive, MANIFEST_NAME, MAX_MANIFEST_BYTES, MANIFEST_NAME
+                ),
+                f"{path}:{MANIFEST_NAME}",
+            )
+    except (OSError, KeyError, zipfile.BadZipFile) as exc:
+        raise ConfigurationError(
+            f"Cannot identify VAO format version for {path}: {exc}"
+        ) from exc
+
+
+def ensure_reference_validator(
+    standard_root: Path | None = None, *, version: str = VAO_STANDARD_VERSION
+) -> Path:
+    root = find_vao_standard_root(standard_root, version=version)
     if root is None:
         raise ConfigurationError(
-            "VAO Standard 0.4.0 reference tools were not found. Set "
-            "VAO_STANDARD_ROOT or pass --standard-root with the released "
-            "vao-standard v0.4.0 checkout."
+            f"VAO Standard {version} reference tools were not found. Set "
+            "VAO_STANDARD_ROOT or pass --standard-root with a checkout that "
+            f"contains {_tool_name(version)} and the {version} schemas."
         )
     probe = subprocess.run(
-        [sys.executable, str(root / "Tools" / "vao04.py"), "--help"],
+        [sys.executable, str(root / "Tools" / _tool_name(version)), "--help"],
         cwd=root,
         text=True,
         capture_output=True,
@@ -426,14 +468,17 @@ def ensure_reference_validator(standard_root: Path | None = None) -> Path:
     if probe.returncode != 0:
         detail = probe.stderr.strip() or probe.stdout.strip() or "unknown error"
         raise ConfigurationError(
-            "VAO Standard 0.4.0 reference validator is not runnable in the current "
+            f"VAO Standard {version} reference validator is not runnable in the current "
             f"Python environment: {detail}"
         )
     return root
 
 
 def _reference_report(
-    process: subprocess.CompletedProcess[str], command: list[str], root: Path
+    process: subprocess.CompletedProcess[str],
+    command: list[str],
+    root: Path,
+    version: str,
 ) -> dict[str, Any]:
     return {
         "valid": process.returncode == 0,
@@ -448,7 +493,7 @@ def _reference_report(
         "stdout": process.stdout.strip(),
         "stderr": process.stderr.strip(),
         "command": command,
-        "standardVersion": VAO_STANDARD_VERSION,
+        "standardVersion": version,
         "standardRoot": str(root),
     }
 
@@ -456,16 +501,17 @@ def _reference_report(
 def run_reference_validator(
     path: Path, *, standard_root: Path | None = None, required: bool = False
 ) -> dict[str, Any] | None:
+    version = _path_version(path)
     root = (
-        ensure_reference_validator(standard_root)
+        ensure_reference_validator(standard_root, version=version)
         if required
-        else find_vao_standard_root(standard_root)
+        else find_vao_standard_root(standard_root, version=version)
     )
     if root is None:
         return None
     command = [
         sys.executable,
-        str(root / "Tools" / "vao04.py"),
+        str(root / "Tools" / _tool_name(version)),
         "validate",
         str(path.resolve()),
     ]
@@ -476,16 +522,17 @@ def run_reference_validator(
         capture_output=True,
         check=False,
     )
-    return _reference_report(process, command, root)
+    return _reference_report(process, command, root, version)
 
 
 def run_reference_manifest_validator(
     manifest_raw: bytes, *, standard_root: Path | None = None, required: bool = False
 ) -> dict[str, Any] | None:
+    version = _document_version(manifest_raw, "Remote VAO manifest")
     root = (
-        ensure_reference_validator(standard_root)
+        ensure_reference_validator(standard_root, version=version)
         if required
-        else find_vao_standard_root(standard_root)
+        else find_vao_standard_root(standard_root, version=version)
     )
     if root is None:
         return None
@@ -498,7 +545,7 @@ def run_reference_manifest_validator(
         temporary.write_bytes(manifest_raw)
         command = [
             sys.executable,
-            str(root / "Tools" / "vao04.py"),
+            str(root / "Tools" / _tool_name(version)),
             "validate",
             str(temporary),
         ]
@@ -509,8 +556,8 @@ def run_reference_manifest_validator(
             capture_output=True,
             check=False,
         )
-        report = _reference_report(process, command, root)
-        report["validator"] = "VAO 0.4.0 reference validator"
+        report = _reference_report(process, command, root, version)
+        report["validator"] = f"VAO {version} reference validator"
         return report
     finally:
         temporary.unlink(missing_ok=True)
@@ -525,16 +572,18 @@ def run_reference_descriptor_validator(
 ) -> dict[str, Any] | None:
     if kind not in {"release", "pack", "receipt", "zenodo-metadata"}:
         raise ValueError(f"Unsupported VAO descriptor kind {kind!r}")
+    raw = path.read_bytes()
+    version = _document_version(raw, str(path))
     root = (
-        ensure_reference_validator(standard_root)
+        ensure_reference_validator(standard_root, version=version)
         if required
-        else find_vao_standard_root(standard_root)
+        else find_vao_standard_root(standard_root, version=version)
     )
     if root is None:
         return None
     command = [
         sys.executable,
-        str(root / "Tools" / "vao04.py"),
+        str(root / "Tools" / _tool_name(version)),
         "validate-descriptor",
         kind,
         str(path.resolve()),
@@ -546,7 +595,7 @@ def run_reference_descriptor_validator(
         capture_output=True,
         check=False,
     )
-    return _reference_report(process, command, root)
+    return _reference_report(process, command, root, version)
 
 
 def run_reference_descriptor_bytes(
@@ -578,21 +627,23 @@ def validate_standard_descriptor_schema(
     standard_root: Path | None = None,
     required: bool = False,
 ) -> dict[str, Any] | None:
-    schema_names = {
-        "carrier": "vao-carrier-0.4.0.schema.json",
-        "pack": "vao-pack-manifest-0.4.0.schema.json",
-    }
-    if kind not in schema_names:
+    if kind not in {"carrier", "pack"}:
         raise ValueError(f"Unsupported VAO schema kind {kind!r}")
+    value = strict_json(raw, f"VAO {kind} descriptor")
+    version = value.get("formatVersion")
+    if version not in VAO_STANDARD_VERSIONS:
+        raise ConfigurationError(
+            f"No descriptor schema is available for VAO {version!r}"
+        )
+    schema_stem = "carrier" if kind == "carrier" else "pack-manifest"
     root = (
-        ensure_reference_validator(standard_root)
+        ensure_reference_validator(standard_root, version=str(version))
         if required
-        else find_vao_standard_root(standard_root)
+        else find_vao_standard_root(standard_root, version=str(version))
     )
     if root is None:
         return None
-    value = strict_json(raw, f"VAO {kind} descriptor")
-    schema_path = root / "Schemas" / schema_names[kind]
+    schema_path = root / "Schemas" / f"vao-{schema_stem}-{version}.schema.json"
     schema = strict_json(
         schema_path.read_bytes(),
         str(schema_path),
@@ -612,6 +663,6 @@ def validate_standard_descriptor_schema(
         "status": "conforming" if not errors else "nonconforming",
         "errors": details,
         "schema": str(schema_path),
-        "standardVersion": VAO_STANDARD_VERSION,
+        "standardVersion": version,
         "standardRoot": str(root),
     }

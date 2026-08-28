@@ -3,13 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .errors import IntegrityError, NetworkError, ResolutionError, UnsupportedError
+from .errors import IntegrityError, NetworkError, ResolutionError
 from .local import (
     run_reference_descriptor_bytes,
     run_reference_manifest_validator,
     validate_standard_descriptor_schema,
 )
 from .models import RemoteFile, VAOInspection
+from .release import select_carrier_file
 from .remote_zip import RemoteZipReader
 from .vao import (
     CARRIER_NAME,
@@ -50,7 +51,11 @@ class VAOResolver:
             else None
         )
         candidates = [item for item in files if item.key.lower().endswith(".vao")]
-        selected = self._select_file(candidates, file_key)
+        selected = (
+            select_carrier_file(files, release, file_key=file_key, mode="bootstrap")
+            if candidates and (file_key is not None or release is not None)
+            else self._select_file(candidates, file_key)
+        )
         warnings: list[str] = []
         communities: list[dict[str, Any]] = []
         community_status = "unknown"
@@ -125,11 +130,6 @@ class VAOResolver:
                     "Remote VAO manifest failed basic validation: "
                     + "; ".join(errors[:8])
                 )
-            if full_conformance and manifest.get("formatVersion") != "0.4.0":
-                raise UnsupportedError(
-                    "Full reference conformance is available only for VAO 0.4.0; "
-                    "use --no-conformance only for explicitly limited legacy inspection"
-                )
             if full_conformance:
                 conformance = run_reference_manifest_validator(
                     source_manifest_raw or b"",
@@ -138,7 +138,7 @@ class VAOResolver:
                 )
                 if not conformance["valid"]:
                     raise IntegrityError(
-                        "Remote manifest failed full VAO 0.4 conformance: "
+                        f"Remote manifest failed full VAO {manifest.get('formatVersion')} conformance: "
                         + (conformance["stderr"] or conformance["stdout"])
                     )
                 if carrier_raw is not None:
@@ -151,7 +151,7 @@ class VAOResolver:
                     conformance["carrierDescriptor"] = carrier_conformance
                     if not carrier_conformance["valid"]:
                         raise IntegrityError(
-                            "Remote carrier descriptor failed the VAO 0.4.0 schema: "
+                            f"Remote carrier descriptor failed the VAO {manifest.get('formatVersion')} schema: "
                             + "; ".join(carrier_conformance["errors"][:8])
                         )
                 if release_file is not None:
@@ -165,7 +165,7 @@ class VAOResolver:
                     )
                     if not release_conformance["valid"]:
                         raise IntegrityError(
-                            "Remote release descriptor failed VAO 0.4.0 validation: "
+                            f"Remote release descriptor failed VAO {manifest.get('formatVersion')} validation: "
                             + (
                                 release_conformance["stderr"]
                                 or release_conformance["stdout"]

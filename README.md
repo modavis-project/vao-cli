@@ -1,17 +1,18 @@
 # VAO CLI
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22133810.svg)](https://doi.org/10.5281/zenodo.22133810)
-[![VAO 0.4.0 persistent identifier](https://img.shields.io/badge/W3ID-VAO%200.4.0-2C5F73.svg)](https://w3id.org/modavis/vao/0.4.0/)
+[![VAO 0.5.0 candidate](https://img.shields.io/badge/VAO-0.5.0%20candidate-2C5F73.svg)](https://github.com/modavis-project/vao-standard)
 
 VAO CLI is a reference command-line client for the
-[Virtual Acoustic Object (VAO) Standard 0.4.0](https://doi.org/10.5281/zenodo.22122774).
+[Virtual Acoustic Object (VAO) Standard](https://github.com/modavis-project/vao-standard).
 It resolves DOI-identified VAOs, inspects their semantic inventory, selects exact
-representations, and retrieves only the bytes required for the requested realization.
+representations, retrieves only the bytes required for a realization, and materializes
+custom local carriers from a published release.
 
 The client treats repository metadata, manifests, carriers, and payloads as distinct
-trust layers. Full VAO conformance is delegated to the released 0.4.0 reference
-validator; completed acquisitions are checked against the byte extent and SHA-256
-declared by the VAO manifest.
+trust layers. Full conformance is delegated to the validator matching the manifest
+version. VAO 0.4.0 remains supported; VAO 0.5.0 adds the two-carrier Zenodo profile and
+exact `carrier-member` retrieval required by large, dynamic datasets.
 
 > The Zenodo integration is read-only. VAO CLI cannot create, edit, publish, submit, or
 > delete Zenodo records. Its publication command only prepares a blocked local review
@@ -21,13 +22,13 @@ declared by the VAO manifest.
 
 | Component | Version |
 | --- | --- |
-| VAO CLI | 0.2.0 |
-| Supported normative VAO release | 0.4.0 |
+| VAO CLI | 0.3.0 |
+| Supported VAO versions | 0.4.0 final; 0.5.0 candidate |
 | Python | 3.11 or newer |
 | Release DOI | [10.5281/zenodo.22133810](https://doi.org/10.5281/zenodo.22133810) |
 
 Legacy VAO 0.3.3 manifests may be inspected with explicitly limited structural checks.
-No 0.3 draft is presented as a current standard or as VAO 0.4.0 conformance.
+No 0.3 draft is presented as a current standard or as later-version conformance.
 
 ## Capabilities
 
@@ -39,9 +40,13 @@ No 0.3 draft is presented as a current standard or as VAO 0.4.0 conformance.
 - Select realizations by identity, asset, group, modality, quality, media type, maximum
   extent, capability, or materialized profile.
 - Acquire embedded members, exact Zenodo repository distributions, VAO pack members,
-  dependency-closed asset groups, and verified inline chunks.
+  members of another release-declared carrier, dependency-closed asset groups, and
+  verified inline chunks.
+- Materialize immutable custom carriers from selected realizations or group closures
+  while retaining the release's exact manifest bytes.
 - Download and verify complete carriers; validate, extract, compare, and revise local
-  VAO 0.4.0 releases without overwriting existing outputs.
+  VAO releases without overwriting existing outputs. Metadata revision remains a
+  VAO 0.4-only operation in this release.
 - Maintain a local SQLite cache and catalog for the moderated
   [`virtual-acoustic-objects`](https://zenodo.org/communities/virtual-acoustic-objects/)
   community.
@@ -60,7 +65,8 @@ release identifier, realization identifier, byte extent, or digest.
 | Inspect assets and realizations | `vao inspect` |
 | Find a suitable realization | `vao select` |
 | Retrieve one realization | `vao fetch` |
-| Download and verify a complete carrier | `vao download` |
+| Build a custom carrier | `vao materialize` |
+| Download the bootstrap or preservation carrier | `vao download` |
 | Start the local resolver interface | `vao serve` |
 
 Run `vao COMMAND --help` for the complete options of a command.
@@ -73,11 +79,10 @@ Standard. Install the release wheel in a virtual environment and obtain the stan
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install \
-  https://github.com/modavis-project/vao-cli/releases/download/v0.2.0/vao_cli-0.2.0-py3-none-any.whl
+git clone https://github.com/modavis-project/vao-cli.git
+python -m pip install ./vao-cli
 
-git clone --branch v0.4.0 --depth 1 \
-  https://github.com/modavis-project/vao-standard.git
+git clone https://github.com/modavis-project/vao-standard.git
 export VAO_STANDARD_ROOT="$(cd vao-standard && pwd)"
 vao doctor
 ```
@@ -87,7 +92,8 @@ root. For tests and development tools, use `python -m pip install -e '.[dev]'`.
 
 The standard checkout supplies the normative schemas and reference validator; the CLI
 package supplies their Python runtime dependencies. Treat that checkout as executable
-code and use the signed `v0.4.0` release from `modavis-project/vao-standard`.
+code. Use the signed `v0.4.0` tag for final VAO 0.4 validation; pin and review the
+standard commit used for a VAO 0.5 release candidate.
 
 ## First validation
 
@@ -98,8 +104,8 @@ vao validate "$VAO_STANDARD_ROOT/Fixtures/VAO04/carriers/minimal.vao"
 ```
 
 `vao validate` runs bounded carrier and payload checks followed by the authoritative
-VAO 0.4.0 reference validator. `--structural-only` performs the bounded local checks but
-makes no conformance claim.
+version-matched reference validator. `--structural-only` performs the bounded local
+checks but makes no conformance claim.
 
 ## DOI discovery and acquisition
 
@@ -116,6 +122,11 @@ vao fetch "$VAO_DOI" urn:example:realization:model:mobile \
   --output model.glb --dry-run
 vao fetch "$VAO_DOI" urn:example:realization:model:mobile \
   --output model.glb
+
+vao materialize "$VAO_DOI" --kind audio --quality mobile \
+  --output mobile-audio.vao
+vao download "$VAO_DOI" --output-dir Downloads
+vao download "$VAO_DOI" --complete --output-dir Preservation
 ```
 
 Concept DOIs resolve to the current version and both identities are reported. Use
@@ -135,13 +146,14 @@ vao --no-color doctor
 | Embedded stored/Deflate member | ZIP bounds, CRC-32, realization byte size, and SHA-256 |
 | Exact repository distribution | Version record, record/file binding, byte size, and SHA-256 |
 | VAO `pack-member` distribution | Exact pack-manifest binding, safe member path, member extent, CRC-32, and SHA-256 |
+| VAO `carrier-member` distribution | Exact version record, release inventory, carrier ID, manifest and descriptor binding, member extent, CRC-32, and realization SHA-256 |
 | Inline chunk range | Consecutive table structure and each selected SHA-256/SHA-512 digest |
-| Complete carrier | Repository checksum when supplied, carrier structure, embedded payloads, and VAO 0.4.0 reference conformance |
+| Complete carrier | Repository checksum when supplied, carrier structure, embedded payloads, and version-matched reference conformance |
 
 A verified chunk is an exact byte extent, not necessarily a playable audio interval or
 self-contained geometry fragment. A selectively acquired pack member proves its own
-identity; it does not prove the digest of an unread outer pack. The client reports that
-boundary explicitly.
+identity; it does not prove the digest of an unread outer pack or carrier. The client
+reports that boundary explicitly. A full `vao download` verifies the outer carrier hash.
 
 ## Local operations
 
@@ -152,13 +164,15 @@ vao compare object-v1.vao object-v2.vao
 vao metadata show object.vao --output metadata.json
 vao metadata apply object.vao metadata.json --output object-v2.vao
 
-vao publication prepare object.vao \
-  --output publication-review --copy-carrier
+vao publication prepare object-bootstrap.vao object-preservation.vao \
+  --readme README.pdf --output publication-review --copy-carrier
 ```
 
 Metadata application leaves the input untouched, creates a new release identifier,
 increments the revision, records the superseded release, updates the exact carrier
 binding, and requires the resulting carrier to pass the 0.4.0 reference validator.
+For VAO 0.5, use `materialize`; the metadata revision command does not rewrite a
+published 0.5 manifest.
 
 Publication preparation creates checksums and schema-valid draft descriptors in a
 local directory. Pending repository identifiers, current Zenodo metadata review,
@@ -191,7 +205,7 @@ The complete documentation is prepared for GitHub Pages at
 ## Related projects
 
 - [VAO Standard](https://github.com/modavis-project/vao-standard) — normative schemas,
-  documentation, fixtures, and the reference validator for VAO 0.4.0
+  documentation, fixtures, and versioned reference validators
 - [VAO Standard documentation](https://modavis-project.github.io/vao-standard/)
 - [MODAVIS Ontology Network](https://github.com/modavis-project/modavis-ontology-network)
   — the published semantic vocabulary network used by VAO metadata
@@ -203,7 +217,7 @@ The complete documentation is prepared for GitHub Pages at
 
 ```sh
 python -m pip install -e '.[dev]'
-export VAO_STANDARD_ROOT=/path/to/vao-standard-v0.4.0
+export VAO_STANDARD_ROOT=/path/to/vao-standard
 python tools/check_release.py
 ```
 

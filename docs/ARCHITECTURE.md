@@ -1,21 +1,24 @@
 ---
 layout: page
 title: Architecture and feasibility
-description: How VAO 0.4 semantics map DOI identity to verified Zenodo byte-range delivery.
+description: How VAO semantics map DOI identity and two carriers to verified Zenodo byte-range delivery.
 permalink: /architecture/
 ---
 
 ## Resolution model
 
-VAO 0.4.0 supplies the semantic and delivery layers used by the client:
+VAO 0.4.0 supplies the original semantic and delivery layers; VAO 0.5.0 adds
+cross-carrier acquisition and a fixed two-carrier publication profile:
 
 ```text
 version DOI
   -> exact Zenodo record/file identity
   -> standalone vao-manifest.json or range-indexed .vao
+  -> vao-release.json (exact record/carrier inventory)
   -> logical assets and asset groups (intent/capability)
   -> realizations (exact media type, byte size, SHA-256, quality tier)
-  -> META-INF/vao-carrier.json (realization ID -> embedded payload path)
+  -> META-INF/vao-carrier.json (carrier identity and embedded paths)
+  -> optional carrier-member distribution (exact other carrier)
   -> Zenodo HTTPS byte ranges
 ```
 
@@ -24,7 +27,7 @@ The resolver therefore interprets the standard instead of inventing parallel
 describe exact byte representations; `assetGroups` already express quality,
 availability, selection policy, dependencies, total extent, required capabilities, and
 profile materialization. `distributions` and repository bindings describe exact remote
-availability. VAO 0.4 also defines `chunking` and optional streaming-index realization
+availability. VAO also defines `chunking` and optional streaming-index realization
 links for verified range-addressable designs.
 
 The manifest intentionally has no carrier paths. Embedded paths belong exclusively in
@@ -39,8 +42,10 @@ This separation is honored by the implementation.
 | DOI -> VAO modalities/capabilities | Yes | Read standalone manifest or remotely index the `.vao` ZIP/ZIP64. |
 | Inspect a large `.vao` without full download | Yes | EOCD, ZIP64 records, central directory, local headers, manifest and carrier use bounded HTTP ranges. |
 | Retrieve one embedded low-resolution model/audio realization | Yes | Resolve VAO ID to carrier path; range-read stored/deflated member; verify CRC, size, and SHA-256. |
+| Retrieve a preservation member while starting from the bootstrap | Yes | Resolve `carrier-member` against `vao-release.json`; pin exact version record, carrier ID/file, manifest, descriptor, member extent, CRC, and realization SHA-256. |
+| Build a purpose-specific `.vao` without the complete carrier | Yes | `vao materialize` selects IDs/groups/semantic matches, fetches only those realizations, preserves the exact manifest, and validates an immutable custom carrier. |
 | Direct browser-to-Zenodo range delivery | Repository-policy dependent | The CLI uses verified server-side range requests. Browser delivery additionally depends on the repository's current cross-origin response policy and is not a CLI guarantee. |
-| Verified quantitative byte extent | Yes, when declared inline | Stored/repository realizations with a complete VAO 0.4 chunk table can be fetched by chunk index/range and checked independently. |
+| Verified quantitative byte extent | Yes, when declared inline | Stored/repository realizations with a complete chunk table can be fetched by chunk index/range and checked independently. |
 | External streaming-index interpretation | Not yet | The linked realization is visible, but its format requires a separately specified/index-aware adapter. |
 | Arbitrary playable audio time slice / usable mesh subset | Not generically | Verified bytes are not automatically a self-contained media unit; usability remains format/index dependent. |
 | Read one Deflate member without its compressed bytes | No | Deflate is sequential; the whole compressed member is required. `ZIP_STORED` is preferred for independently compressed media. |
@@ -49,8 +54,9 @@ This separation is honored by the implementation.
 | Use the community as integrity authority | No | It is a moderated discovery authority; exact manifests and digests are integrity authority. |
 | Resolve arbitrary external URLs from a manifest | Deliberately no | Only record-owned Zenodo endpoints are followed by this adapter. |
 | Edit metadata in-place | No | VAO release identity covers semantics. The editor creates a new local release and leaves the source untouched. |
-| Exact repository distribution | Yes | Requires the 0.4 Zenodo binding, exact version PID, record ID, file ID, public access, size, and final realization SHA-256. |
+| Exact repository distribution | Yes | Requires the Zenodo binding, exact version PID, record ID, file ID, public access, size, and final realization SHA-256. |
 | Pack-member selective retrieval | Yes, with a bounded claim | Stored nested/external packs are indexed and the exact pack manifest/member identity is enforced. The output member is verified; the untouched outer pack is reported as not fully read. |
+| Carrier-member selective retrieval | Yes, with a bounded claim | The release inventory and target carrier metadata are verified before member acquisition. The output member is verified; the untouched outer carrier hash is explicitly reported as not fully read. |
 
 ## Archive behavior
 
@@ -75,9 +81,9 @@ Unicode-normalized duplicates, and validates central/local header agreement.
 - A VAO carrier path cannot redirect the client to an arbitrary origin.
 - Remote discovery is structurally and semantically checked, but full payload integrity
   is established only when a realization or complete carrier is read.
-- A selectively retrieved pack member can prove its own exact realization identity but
-  cannot prove the SHA-256 of an unread outer pack. The CLI reports these two assurance
-  levels separately.
+- A selectively retrieved pack or carrier member can prove its own exact realization
+  identity but cannot prove the SHA-256 of an unread outer container. The CLI reports
+  these assurance levels separately. A complete download verifies the outer hash.
 - Zenodo's transport MD5 is checked on full downloads; VAO's SHA-256 remains the content
   identity.
 - No upload token is accepted and no mutation endpoints exist.

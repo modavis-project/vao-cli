@@ -367,3 +367,237 @@ def write_vao(path: Path) -> tuple[dict[str, Any], bytes]:
     data, manifest, payload = make_vao()
     path.write_bytes(data)
     return manifest, payload
+
+
+def make_two_carrier_vao() -> tuple[dict[str, bytes], dict[str, Any], str, bytes]:
+    """Build a self-contained VAO 0.5 two-carrier record for range tests."""
+    payload = b"preservation realization in the closure carrier\n" * 8192
+    realization_id = "urn:test:realization:preservation"
+    carrier_id = "urn:test:carrier:preservation"
+    manifest = {
+        "$schema": "https://w3id.org/modavis/vao/0.5.0/schema/manifest.json",
+        "@context": ["https://w3id.org/modavis/vao/0.5.0/context.jsonld"],
+        "type": "VirtualAcousticObject",
+        "formatVersion": "0.5.0",
+        "id": "urn:test:vao:two-carrier",
+        "title": {"en": "Two-carrier test VAO"},
+        "release": {
+            "id": "urn:test:release:two-carrier:1",
+            "revision": 1,
+            "contentVersion": "1.0.0",
+        },
+        "logicalAssets": [
+            {
+                "id": "urn:test:asset:preservation",
+                "labels": {"en": "Preservation audio"},
+                "realizationIds": [realization_id],
+            }
+        ],
+        "realizations": [
+            {
+                "id": realization_id,
+                "assetId": "urn:test:asset:preservation",
+                "byteSize": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "mediaType": "audio/flac",
+                "qualityTier": "preservation",
+                "representationStatus": "master",
+                "technicalMetadata": {"kind": "audio"},
+                "distributionIds": ["urn:test:distribution:preservation-carrier"],
+            }
+        ],
+        "distributions": [
+            {
+                "id": "urn:test:distribution:preservation-carrier",
+                "kind": "carrier-member",
+                "carrierId": carrier_id,
+                "repositoryBindingId": "urn:test:binding:zenodo",
+                "persistentIdentifier": "https://doi.org/10.5281/zenodo.1",
+                "recordIdentifier": "1",
+                "fileIdentifier": "complete.vao",
+                "access": "public",
+            }
+        ],
+        "repositoryBindings": [
+            {
+                "id": "urn:test:binding:zenodo",
+                "repositoryType": "https://w3id.org/modavis/vao/repository/zenodo",
+                "instance": "https://zenodo.org",
+                "apiProfile": "https://w3id.org/modavis/vao/repository/zenodo/records-api/1",
+                "resolutionPolicy": "version-pid-record-file",
+            }
+        ],
+        "assetGroups": [],
+    }
+    manifest_raw = json.dumps(manifest, sort_keys=True, indent=2).encode() + b"\n"
+
+    def carrier_bytes(descriptor: dict[str, Any], members: dict[str, bytes]) -> bytes:
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", allowZip64=True) as archive:
+            archive.writestr(
+                "mimetype",
+                b"application/vnd.modavis.vao+zip",
+                compress_type=zipfile.ZIP_STORED,
+            )
+            archive.writestr(
+                "vao-manifest.json", manifest_raw, compress_type=zipfile.ZIP_STORED
+            )
+            archive.writestr(
+                "META-INF/vao-carrier.json",
+                json.dumps(descriptor, sort_keys=True, indent=2).encode() + b"\n",
+                compress_type=zipfile.ZIP_STORED,
+            )
+            for name, data in members.items():
+                archive.writestr(name, data, compress_type=zipfile.ZIP_STORED)
+        return buffer.getvalue()
+
+    common = {
+        "formatVersion": "0.5.0",
+        "type": "VAOCarrier",
+        "releaseId": manifest["release"]["id"],
+        "manifestByteSize": len(manifest_raw),
+        "manifestSHA256": hashlib.sha256(manifest_raw).hexdigest(),
+    }
+    bootstrap_descriptor = {
+        **common,
+        "id": "urn:test:carrier:bootstrap",
+        "carrierMode": "bootstrap",
+        "completeGroupIds": [],
+        "embeddedRealizations": [],
+    }
+    complete_descriptor = {
+        **common,
+        "id": carrier_id,
+        "carrierMode": "preservation-closure",
+        "completeGroupIds": [],
+        "embeddedRealizations": [
+            {"realizationId": realization_id, "path": "payload/audio.flac"}
+        ],
+    }
+    bootstrap = carrier_bytes(bootstrap_descriptor, {})
+    complete = carrier_bytes(complete_descriptor, {"payload/audio.flac": payload})
+
+    def inventory(name: str, data: bytes, descriptor: dict[str, Any]) -> dict[str, Any]:
+        descriptor_raw = (
+            json.dumps(descriptor, sort_keys=True, indent=2).encode() + b"\n"
+        )
+        return {
+            "fileIdentifier": name,
+            "role": "carrier",
+            "byteSize": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "carrierId": descriptor["id"],
+            "carrierMode": descriptor["carrierMode"],
+            "manifestByteSize": len(manifest_raw),
+            "manifestSHA256": hashlib.sha256(manifest_raw).hexdigest(),
+            "carrierDescriptorByteSize": len(descriptor_raw),
+            "carrierDescriptorSHA256": hashlib.sha256(descriptor_raw).hexdigest(),
+            "completeGroupIds": descriptor["completeGroupIds"],
+        }
+
+    release = {
+        "$schema": "https://w3id.org/modavis/vao/0.5.0/schema/release.json",
+        "type": "VAORelease",
+        "formatVersion": "0.5.0",
+        "vaoId": manifest["id"],
+        "releaseId": manifest["release"]["id"],
+        "revision": 1,
+        "contentVersion": "1.0.0",
+        "publication": {
+            "topology": "single-record",
+            "rootRecord": {
+                "id": "urn:test:publication:record",
+                "repositoryType": "https://w3id.org/modavis/vao/repository/zenodo",
+                "instance": "https://zenodo.org",
+                "versionPersistentIdentifier": "https://doi.org/10.5281/zenodo.1",
+                "conceptPersistentIdentifier": "https://doi.org/10.5281/zenodo.10",
+                "recordIdentifier": "1",
+                "files": [
+                    inventory("bootstrap.vao", bootstrap, bootstrap_descriptor),
+                    inventory("complete.vao", complete, complete_descriptor),
+                ],
+            },
+            "familyMembers": [],
+        },
+    }
+    return (
+        {
+            "bootstrap.vao": bootstrap,
+            "complete.vao": complete,
+            "vao-manifest.json": manifest_raw,
+            "vao-release.json": json.dumps(release, sort_keys=True, indent=2).encode()
+            + b"\n",
+        },
+        release,
+        realization_id,
+        payload,
+    )
+
+
+class MultiFileMemoryHTTP:
+    def __init__(self, values: dict[str, bytes]):
+        self.values = values
+        self.ranges: list[tuple[str, int, int]] = []
+
+    def get_range(self, url: str, start: int, end: int):
+        self.ranges.append((url, start, end))
+        return self.values[url][start : end + 1], Message()
+
+    def get_bytes(self, url: str, *, maximum: int, headers=None):
+        data = self.values[url]
+        if len(data) > maximum:
+            raise AssertionError("test body exceeds maximum")
+        return data
+
+    def get_cached_bytes(self, url: str, *, maximum: int, ttl: float = 300):
+        return self.get_bytes(url, maximum=maximum)
+
+    @contextmanager
+    def open(self, url: str, *, headers=None):
+        data = self.values[url]
+        match = re.fullmatch(r"bytes=(\d+)-(\d+)", (headers or {}).get("Range", ""))
+        if match:
+            start, end = int(match.group(1)), int(match.group(2))
+            self.ranges.append((url, start, end))
+            response = MemoryResponse(data[start : end + 1], start, end, len(data))
+        else:
+            response = MemoryResponse(data, 0, len(data) - 1, len(data))
+            response.status = 200
+        yield response
+
+
+class MultiFileMemoryZenodoClient:
+    def __init__(self, files: dict[str, bytes]):
+        self.instance = PRODUCTION
+        self.record = {
+            "id": 1,
+            "doi": "10.5281/zenodo.1",
+            "conceptdoi": "10.5281/zenodo.10",
+            "metadata": {"title": "Two-carrier VAO", "version": "1.0.0"},
+        }
+        self._urls = {
+            name: f"https://zenodo.org/api/records/1/files/{name}/content"
+            for name in files
+        }
+        self.http = MultiFileMemoryHTTP(
+            {self._urls[name]: value for name, value in files.items()}
+        )
+
+    def resolve(self, doi: str, *, allow_concept: bool = True):
+        return ResolvedRecord(
+            requested_doi=doi,
+            resolved_doi="10.5281/zenodo.1",
+            concept_doi="10.5281/zenodo.10",
+            record_id="1",
+            instance=PRODUCTION,
+            record=self.record,
+        )
+
+    def for_resolved(self, _resolved):
+        return self
+
+    def files(self, _record):
+        return [
+            RemoteFile(name, len(self.http.values[url]), None, url)
+            for name, url in self._urls.items()
+        ]

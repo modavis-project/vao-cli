@@ -7,14 +7,14 @@ from collections import Counter
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from . import VAO_STANDARD_VERSION
+from . import VAO_STANDARD_VERSIONS
 from .errors import IntegrityError
 
 MIMETYPE = b"application/vnd.modavis.vao+zip"
 MANIFEST_NAME = "vao-manifest.json"
 CARRIER_NAME = "META-INF/vao-carrier.json"
 RELEASE_NAME = "vao-release.json"
-SUPPORTED_FORMATS = {"0.3.3", VAO_STANDARD_VERSION}
+SUPPORTED_FORMATS = {"0.3.3", *VAO_STANDARD_VERSIONS}
 MAX_SAFE_INTEGER = (1 << 53) - 1
 MAX_JSON_DEPTH = 128
 
@@ -118,20 +118,20 @@ def basic_manifest_errors(manifest: dict[str, Any]) -> list[str]:
     release = manifest.get("release")
     if not isinstance(release, dict) or not release.get("id"):
         errors.append("Manifest release has no identifier")
-    if version == VAO_STANDARD_VERSION:
+    if version in VAO_STANDARD_VERSIONS:
         if manifest.get("$schema") != (
-            "https://w3id.org/modavis/vao/0.4.0/schema/manifest.json"
+            f"https://w3id.org/modavis/vao/{version}/schema/manifest.json"
         ):
-            errors.append("VAO 0.4.0 manifest has an incorrect $schema identifier")
+            errors.append(f"VAO {version} manifest has an incorrect $schema identifier")
         context = manifest.get("@context")
         if (
             not isinstance(context, list)
             or not context
-            or context[0] != ("https://w3id.org/modavis/vao/0.4.0/context.jsonld")
+            or context[0] != (f"https://w3id.org/modavis/vao/{version}/context.jsonld")
         ):
-            errors.append("VAO 0.4.0 manifest lacks the canonical first @context")
+            errors.append(f"VAO {version} manifest lacks the canonical first @context")
         if manifest.get("type") != "VirtualAcousticObject":
-            errors.append("VAO 0.4.0 manifest has an incorrect type")
+            errors.append(f"VAO {version} manifest has an incorrect type")
     assets = (
         manifest.get("logicalAssets")
         if isinstance(manifest.get("logicalAssets"), list)

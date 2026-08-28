@@ -20,6 +20,7 @@ from .local import (
     run_reference_validator,
     validate_local_carrier,
 )
+from .materialize import materialize_carrier
 from .metadata import apply_metadata, edit_metadata, write_projection
 from .models import INSTANCES
 from .output import emit_json, error, human_size, table
@@ -81,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument(
         "--no-conformance",
         action="store_true",
-        help="skip the full VAO 0.4 reference check",
+        help="skip the full version-matched VAO reference check",
     )
     _standard_root_argument(inspect)
 
@@ -136,12 +137,35 @@ def build_parser() -> argparse.ArgumentParser:
     download.add_argument("doi")
     download.add_argument("--output-dir", type=Path, default=Path.cwd())
     download.add_argument("--file", help="Zenodo .vao file key")
-    download.add_argument(
+    download_mode = download.add_mutually_exclusive_group()
+    download_mode.add_argument(
         "--all", action="store_true", help="download every .vao on the record"
+    )
+    download_mode.add_argument(
+        "--complete",
+        action="store_true",
+        help="download the declared preservation-closure carrier",
     )
     download.add_argument("--exact", action="store_true", help="reject a concept DOI")
     download.add_argument("--no-conformance", action="store_true")
     _standard_root_argument(download)
+
+    materialize = commands.add_parser(
+        "materialize", help="build a custom local carrier from selected realizations"
+    )
+    materialize.add_argument("doi")
+    materialize.add_argument("--output", type=Path, required=True)
+    materialize.add_argument("--file", help="Zenodo bootstrap .vao file key")
+    materialize.add_argument("--realization", action="append", default=[])
+    materialize.add_argument("--group", action="append", default=[])
+    materialize.add_argument(
+        "--all", action="store_true", help="include every declared realization"
+    )
+    materialize.add_argument("--dry-run", action="store_true")
+    materialize.add_argument("--exact", action="store_true")
+    _add_selection_arguments(materialize, include_group=False)
+    materialize.add_argument("--no-conformance", action="store_true")
+    _standard_root_argument(materialize)
 
     relations = commands.add_parser(
         "relations", help="show Zenodo relations and version history"
@@ -208,9 +232,12 @@ def build_parser() -> argparse.ArgumentParser:
     publication_prepare = publication_commands.add_parser(
         "prepare", help="stage a validated VAO for later publication"
     )
-    publication_prepare.add_argument("input", type=Path)
+    publication_prepare.add_argument("input", type=Path, nargs="+")
     publication_prepare.add_argument("--output", type=Path, required=True)
     publication_prepare.add_argument("--copy-carrier", action="store_true")
+    publication_prepare.add_argument(
+        "--readme", type=Path, help="reviewed PDF record guide to stage as README.pdf"
+    )
     _standard_root_argument(publication_prepare)
 
     community = commands.add_parser(
@@ -236,7 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
     community_ack.add_argument("doi", nargs="?")
 
     metadata = commands.add_parser(
-        "metadata", help="show or edit VAO 0.4 descriptive metadata"
+        "metadata", help="show or edit VAO descriptive metadata"
     )
     metadata_commands = metadata.add_subparsers(dest="metadata_command", required=True)
     metadata_show = metadata_commands.add_parser(
@@ -262,9 +289,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _add_selection_arguments(parser: argparse.ArgumentParser) -> None:
+def _add_selection_arguments(
+    parser: argparse.ArgumentParser, *, include_group: bool = True
+) -> None:
     parser.add_argument("--asset", dest="asset_id")
-    parser.add_argument("--group", dest="group_id")
+    if include_group:
+        parser.add_argument("--group", dest="group_id")
     parser.add_argument(
         "--kind",
         choices=(
@@ -300,7 +330,7 @@ def _standard_root_argument(parser: argparse.ArgumentParser) -> None:
         dest="standard_root",
         type=Path,
         metavar="STANDARD_ROOT",
-        help="released VAO Standard 0.4.0 source checkout",
+        help="VAO Standard source checkout containing the requested version",
     )
 
 
@@ -474,10 +504,40 @@ def _dispatch(args: argparse.Namespace) -> Any:
             args.output_dir,
             file_key=args.file,
             all_files=args.all,
+            complete=args.complete,
             allow_concept=not args.exact,
             conformance=not args.no_conformance,
             standard_root=args.standard_root,
             progress=_transfer(args, "Downloading carrier"),
+        )
+    if args.command == "materialize":
+        constraints = _constraints(args)
+        semantic = any(
+            getattr(constraints, name) is not None
+            for name in (
+                "asset_id",
+                "kind",
+                "quality",
+                "media_type",
+                "max_bytes",
+                "capability",
+                "profile",
+            )
+        )
+        return materialize_carrier(
+            _client(args),
+            args.doi,
+            args.output,
+            realization_ids=args.realization,
+            group_ids=args.group,
+            all_realizations=args.all,
+            file_key=args.file,
+            allow_concept=not args.exact,
+            dry_run=args.dry_run,
+            constraints=constraints if semantic else None,
+            conformance=not args.no_conformance,
+            standard_root=args.standard_root,
+            progress=_transfer(args, "Acquiring carrier member"),
         )
     if args.command == "relations":
         client = _client(args)
@@ -506,13 +566,9 @@ def _dispatch(args: argparse.Namespace) -> Any:
         result = validate_local_carrier(args.path, verify_payloads=not args.no_payloads)
         if not args.structural_only:
             manifest = result.get("manifest")
-            if result["valid"] and (
-                not isinstance(manifest, dict)
-                or manifest.get("formatVersion") != "0.4.0"
-            ):
+            if result["valid"] and not isinstance(manifest, dict):
                 raise UnsupportedError(
-                    "Full reference conformance is available only for VAO 0.4.0; "
-                    "use --structural-only only for explicitly limited legacy validation"
+                    "Full reference conformance requires a supported VAO manifest"
                 )
             result["referenceConformance"] = run_reference_validator(
                 args.path, standard_root=args.standard_root, required=True
@@ -553,6 +609,7 @@ def _dispatch(args: argparse.Namespace) -> Any:
             args.input,
             args.output,
             copy_carrier=args.copy_carrier,
+            readme=args.readme,
             standard_root=args.standard_root,
         )
     if args.command == "community":
@@ -665,10 +722,11 @@ def _emit_human(args: argparse.Namespace, value: Any) -> None:
             else terminal.warning(f"Official VAO community: {status}")
         )
         if value.get("conformance"):
+            standard_version = value["conformance"].get("standardVersion", "unknown")
             print(
-                terminal.success("Full VAO 0.4 reference conformance")
+                terminal.success(f"Full VAO {standard_version} reference conformance")
                 if value["conformance"]["valid"]
-                else terminal.failure("VAO 0.4 conformance failed")
+                else terminal.failure(f"VAO {standard_version} conformance failed")
             )
         if summary:
             print(
@@ -679,7 +737,7 @@ def _emit_human(args: argparse.Namespace, value: Any) -> None:
                 f"Groups: {summary['assetGroupCount']}  Extent: {human_size(summary['totalRealizationBytes'])}"
             )
         else:
-            print("No inspectable VAO 0.4/0.3.3 manifest was found.")
+            print("No inspectable supported VAO manifest was found.")
         if value["assets"]:
             rows = [
                 dict(row, size=human_size(row.get("byteSize")))
@@ -799,6 +857,20 @@ def _emit_human(args: argparse.Namespace, value: Any) -> None:
             print(
                 f"Downloaded {item['file']} -> {item['output']} ({human_size(item['byteSize'])})"
             )
+    elif args.command == "materialize":
+        verb = "Would materialize" if value["dryRun"] else "Materialized"
+        print(
+            terminal.success(
+                f"{verb} {value['realizationCount']} realizations as a custom carrier"
+            )
+        )
+        print(
+            f"Output: {value['output']}  Payload extent: {human_size(value['totalByteSize'])}"
+        )
+        if not value["dryRun"]:
+            print(
+                f"Carrier size: {human_size(value['byteSize'])}  SHA-256: {value['sha256']}"
+            )
     elif args.command == "relations":
         print(
             table(
@@ -843,10 +915,11 @@ def _emit_human(args: argparse.Namespace, value: Any) -> None:
             )
         else:
             reference = value.get("referenceConformance")
+            standard_version = reference.get("standardVersion", "unknown")
             if reference["valid"]:
-                print(terminal.success("VAO 0.4.0 reference conformance"))
+                print(terminal.success(f"VAO {standard_version} reference conformance"))
             else:
-                print(terminal.failure("VAO 0.4.0 reference conformance"))
+                print(terminal.failure(f"VAO {standard_version} reference conformance"))
                 detail = reference.get("stderr") or reference.get("stdout")
                 if detail:
                     print(detail)
@@ -902,9 +975,10 @@ def _emit_human(args: argparse.Namespace, value: Any) -> None:
     elif args.command == "publication":
         print(terminal.heading("Offline publication staging"))
         print(terminal.success(f"Validated and staged at {value['destination']}"))
-        print(
-            f"Manifest: {value['manifestSHA256']}\nCarrier: {value['carrierSHA256']}\nVerified payloads: {human_size(value['verifiedPayloadBytes'])}"
-        )
+        print(f"Manifest: {value['manifestSHA256']}")
+        for name, digest in value["carrierSHA256s"].items():
+            print(f"Carrier {name}: {digest}")
+        print(f"Verified payloads: {human_size(value['verifiedPayloadBytes'])}")
         print(terminal.warning("Live Zenodo identities remain intentionally pending"))
     elif args.command == "community":
         if args.community_command == "list":
@@ -979,6 +1053,7 @@ def _phase_label(args: argparse.Namespace) -> str:
         "fetch": "Planning and verifying selective acquisition",
         "fetch-group": "Planning and verifying asset-group acquisition",
         "download": "Downloading and validating carriers",
+        "materialize": "Building a custom VAO carrier",
         "relations": "Resolving record relations",
         "validate": "Validating local VAO",
         "extract": "Extracting verified realization",

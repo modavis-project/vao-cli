@@ -1,21 +1,20 @@
 ---
 layout: page
 title: Getting started
-description: Install VAO CLI, connect the released VAO 0.4.0 reference tools, and validate or resolve a first object.
+description: Install VAO CLI, connect versioned VAO reference tools, and retrieve or materialize a first object.
 permalink: /getting-started/
 ---
 
 ## Requirements
 
 - Python 3.11 or newer.
-- A source checkout of the released VAO Standard 0.4.0 for full conformance.
+- A VAO Standard checkout containing the validator for the document version.
 - HTTPS access to Zenodo for remote commands.
 
 ## Install
 
 ```sh
 git clone https://github.com/modavis-project/vao-standard.git
-git -C vao-standard checkout v0.4.0
 git clone https://github.com/modavis-project/vao-cli.git
 
 cd vao-cli
@@ -31,8 +30,9 @@ The standard checkout supplies the normative schemas and reference implementatio
 VAO CLI accepts `--standard-root` for a single command when an environment variable is
 not appropriate.
 
-The reference validator is executed from this checkout. Use the signed `v0.4.0` tag in
-the official repository and do not point `VAO_STANDARD_ROOT` at an untrusted directory.
+The reference validator is executed from this checkout. Use the signed `v0.4.0` tag for
+final VAO 0.4 work. For a VAO 0.5 release candidate, pin and record the reviewed standard
+commit. Do not point `VAO_STANDARD_ROOT` at an untrusted directory.
 
 ## Validate the released fixture
 
@@ -40,9 +40,9 @@ the official repository and do not point `VAO_STANDARD_ROOT` at an untrusted dir
 vao validate "$VAO_STANDARD_ROOT/Fixtures/VAO04/carriers/minimal.vao"
 ```
 
-Successful output distinguishes the local bounded carrier checks from full VAO 0.4.0
-reference conformance. `--structural-only` deliberately omits the second layer and
-makes no conformance claim.
+Successful output distinguishes local bounded checks from full, version-matched
+reference conformance. `--structural-only` deliberately omits the second layer and makes
+no conformance claim.
 
 ## Resolve and inspect a record
 
@@ -69,15 +69,22 @@ vao fetch "$VAO_DOI" urn:example:realization:model:mobile \
 
 vao fetch "$VAO_DOI" urn:example:realization:model:mobile \
   --output model.glb
+
+vao materialize "$VAO_DOI" --kind audio --quality mobile \
+  --output mobile-audio.vao
 ```
 
 The dry run reports the delivery type, member, compressed extent, and HTTP byte range.
 The real operation writes a temporary output, verifies its declared identity, and then
 commits it atomically. Existing outputs are refused.
 
+On a VAO 0.5 two-carrier record, inspection starts with the release-declared bootstrap.
+If a requested realization lives only in the preservation closure, `fetch` follows its
+exact `carrier-member` binding and reads only the necessary carrier ranges.
+
 Friendly quality terms map to the standard tiers:
 
-| Input | VAO 0.4.0 tier |
+| Input | VAO tier |
 | --- | --- |
 | `preview` | `bootstrap` |
 | `low` | `mobile` |
@@ -92,6 +99,7 @@ Global options precede the command:
 ```sh
 vao --json inspect "$VAO_DOI" --assets
 vao --quiet download "$VAO_DOI" --output-dir Downloads
+vao --quiet download "$VAO_DOI" --complete --output-dir Preservation
 vao --no-color doctor
 ```
 

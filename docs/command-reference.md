@@ -49,8 +49,9 @@ vao inspect DOI [--file KEY] [--assets] [--groups] [--archive]
 ```
 
 Inspects a standalone manifest or range-indexes a `.vao` carrier. `--assets`, `--groups`,
-and `--archive` add detailed tables. Full VAO 0.4 manifest conformance runs by default.
-`--standard-root` points to the released VAO Standard 0.4.0 checkout. Community status
+and `--archive` add detailed tables. Version-matched manifest conformance runs by
+default. `--standard-root` points to a VAO Standard checkout containing that version.
+Community status
 is checked against `virtual-acoustic-objects`.
 
 ### `relations`
@@ -126,14 +127,33 @@ group dependencies. The destination directory must not exist.
 ### `download`
 
 ```text
-vao download DOI [--output-dir PATH] [--file KEY] [--all] [--exact]
+vao download DOI [--output-dir PATH] [--file KEY] [--all | --complete] [--exact]
                  [--no-conformance] [--standard-root PATH]
 ```
 
-Downloads complete `.vao` carriers. Without `--file` or `--all`, exactly one carrier must
-exist. Checks include record size, Zenodo MD5 when present, release SHA-256 when
-inventoried, complete embedded realization integrity, and VAO 0.4 reference conformance
-unless disabled.
+Downloads complete `.vao` carriers. With neither `--file`, `--all`, nor `--complete`,
+the bootstrap carrier declared by `vao-release.json` is selected. `--complete` selects
+the declared preservation-closure carrier. Checks include record size, Zenodo MD5 when
+present, release SHA-256 when inventoried, complete embedded realization integrity, and
+version-matched VAO reference conformance unless disabled.
+
+### `materialize`
+
+```text
+vao materialize DOI --output PATH
+    [--realization ID ...] [--group ID ...] [--all]
+    [--asset ID] [--kind KIND] [--quality TIER] [--media-type TYPE]
+    [--max-bytes SIZE] [--capability ID] [--profile ID]
+    [--prefer best|smallest] [--file KEY] [--dry-run] [--exact]
+    [--no-conformance] [--standard-root PATH]
+```
+
+Creates an immutable custom `.vao` carrier from any union of explicit realizations,
+asset-group closures, or semantic filters. `--all` requests every realization. The
+command retrieves only selected payload members, verifies each against the manifest,
+embeds the exact published manifest bytes, and validates the completed carrier before
+committing the output path. `--dry-run` reports the planned population and extent
+without creating or downloading payload files.
 
 ## Local carrier commands
 
@@ -144,7 +164,7 @@ vao validate PATH [--no-payloads] [--structural-only|--no-conformance]
                   [--standard-root PATH]
 ```
 
-Validates the local carrier. Payload verification and VAO 0.4.0 reference conformance
+Validates the local carrier. Payload verification and version-matched reference conformance
 are on by default. `--structural-only` (alias `--no-conformance`) runs only bounded
 local structure and integrity checks and makes no VAO conformance claim. `--no-payloads`
 skips payload hashing in the local layer; unless structural-only mode is also selected,
@@ -212,13 +232,15 @@ the projection is preserved.
 ## Publication preparation
 
 ```text
-vao publication prepare INPUT --output DIRECTORY [--copy-carrier]
-                        [--standard-root PATH]
+vao publication prepare INPUT [INPUT ...] --output DIRECTORY [--copy-carrier]
+                        [--readme README.pdf] [--standard-root PATH]
 ```
 
 Creates a local staging directory containing a standalone manifest, `SHA256SUMS`, a
-release template, Zenodo metadata projection, and readiness report. The directory must be
-empty or absent. Repository identities and rights remain pending, so
+release template, Zenodo metadata projection, and readiness report. VAO 0.5 staging
+requires exactly one bootstrap and one preservation-closure input; `--readme` adds the
+reviewed record guide under the fixed `README.pdf` name. The directory must be empty or
+absent. Repository identities and rights remain pending, so
 `readyForLivePublication` is deliberately false. No Zenodo request is made.
 
 ## Diagnostics and service

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.support import write_vao
+from tests.support import make_two_carrier_vao, write_vao
 from vao_cli.cache import PersistentCache
 from vao_cli.compare import compare_carriers
 from vao_cli.local import extract_local_realization
@@ -116,6 +116,43 @@ class AdvancedTests(unittest.TestCase):
                 metadata["metadata"]["communities"][0]["identifier"],
                 "virtual-acoustic-objects",
             )
+
+    def test_stages_the_vao_05_two_carrier_record_profile(self):
+        files, _release, _identifier, _payload = make_two_carrier_vao()
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            bootstrap = root / "bootstrap.vao"
+            complete = root / "complete.vao"
+            bootstrap.write_bytes(files[bootstrap.name])
+            complete.write_bytes(files[complete.name])
+            valid = {"valid": True, "status": "conforming"}
+            with (
+                patch(
+                    "vao_cli.publication.run_reference_validator",
+                    return_value=valid,
+                ),
+                patch(
+                    "vao_cli.publication.run_reference_descriptor_validator",
+                    return_value=valid,
+                ),
+            ):
+                report = prepare_publication(
+                    [bootstrap, complete], root / "staging", copy_carrier=True
+                )
+            release = json.loads(
+                (root / "staging" / "vao-release.template.json").read_text()
+            )
+            carrier_files = [
+                item
+                for item in release["publication"]["rootRecord"]["files"]
+                if item["role"] == "carrier"
+            ]
+            self.assertEqual(
+                {item["carrierMode"] for item in carrier_files},
+                {"bootstrap", "preservation-closure"},
+            )
+            self.assertEqual(len(report["carrierSHA256s"]), 2)
+            self.assertTrue((root / "staging" / "SHA256SUMS").is_file())
 
 
 if __name__ == "__main__":

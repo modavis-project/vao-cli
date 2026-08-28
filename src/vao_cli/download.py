@@ -9,18 +9,23 @@ from typing import Any
 
 from .errors import IntegrityError, ResolutionError, UnsupportedError
 from .local import (
-    ensure_reference_validator,
     run_reference_descriptor_bytes,
     run_reference_validator,
     validate_local_carrier,
 )
 from .models import RemoteFile, ResolvedRecord
+from .release import select_carrier_file
 from .vao import RELEASE_NAME
 from .zenodo import ZenodoClient
 
 
 def select_vao_files(
-    files: list[RemoteFile], *, file_key: str | None, all_files: bool
+    files: list[RemoteFile],
+    release: dict[str, Any] | None,
+    *,
+    file_key: str | None,
+    all_files: bool,
+    complete: bool,
 ) -> list[RemoteFile]:
     candidates = [item for item in files if item.key.lower().endswith(".vao")]
     if file_key:
@@ -34,11 +39,13 @@ def select_vao_files(
         if not candidates:
             raise ResolutionError("Zenodo record contains no .vao files")
         return candidates
-    if len(candidates) != 1:
-        raise ResolutionError(
-            f"Zenodo record contains {len(candidates)} .vao files; use --file or --all"
+    return [
+        select_carrier_file(
+            files,
+            release,
+            mode="preservation-closure" if complete else "bootstrap",
         )
-    return candidates
+    ]
 
 
 def download_vaos(
@@ -48,23 +55,28 @@ def download_vaos(
     *,
     file_key: str | None = None,
     all_files: bool = False,
+    complete: bool = False,
     allow_concept: bool = True,
     conformance: bool = True,
     standard_root: Path | None = None,
     progress: Callable[[int, int], None] | None = None,
 ) -> list[dict[str, Any]]:
-    if conformance:
-        ensure_reference_validator(standard_root)
     resolved = client.resolve(doi, allow_concept=allow_concept)
     client = client.for_resolved(resolved)
     files = client.files(resolved.record)
-    selected = select_vao_files(files, file_key=file_key, all_files=all_files)
     destination.mkdir(parents=True, exist_ok=True)
-    inventory = _release_inventory(
+    release, inventory = _release_inventory(
         client,
         files,
         conformance=conformance,
         standard_root=standard_root,
+    )
+    selected = select_vao_files(
+        files,
+        release,
+        file_key=file_key,
+        all_files=all_files,
+        complete=complete,
     )
     reports: list[dict[str, Any]] = []
     for remote in selected:
@@ -93,14 +105,9 @@ def download_vaos(
                 + "; ".join(local_report["errors"][:8])
             )
         manifest = local_report.get("manifest")
-        if conformance and (
-            not isinstance(manifest, dict) or manifest.get("formatVersion") != "0.4.0"
-        ):
+        if conformance and not isinstance(manifest, dict):
             target.unlink(missing_ok=True)
-            raise UnsupportedError(
-                "Full reference conformance is available only for VAO 0.4.0; "
-                "use --no-conformance only for explicitly limited legacy downloads"
-            )
+            raise UnsupportedError("Downloaded carrier has no supported VAO manifest")
         if conformance:
             reference = run_reference_validator(
                 target, standard_root=standard_root, required=True
@@ -109,7 +116,7 @@ def download_vaos(
             if not reference["valid"]:
                 target.unlink(missing_ok=True)
                 raise IntegrityError(
-                    "Downloaded carrier failed the VAO 0.4.0 reference validator: "
+                    f"Downloaded carrier failed the VAO {manifest.get('formatVersion')} reference validator: "
                     + (reference["stderr"] or reference["stdout"])
                 )
         reports.append(report)
@@ -188,10 +195,10 @@ def _release_inventory(
     *,
     conformance: bool,
     standard_root: Path | None,
-) -> dict[str, dict[str, Any]]:
+) -> tuple[dict[str, Any] | None, dict[str, dict[str, Any]]]:
     release_file = next((item for item in files if item.key == RELEASE_NAME), None)
     if release_file is None:
-        return {}
+        return None, {}
     raw = client.http.get_cached_bytes(
         release_file.content_url, maximum=16 * 1024 * 1024
     )
@@ -201,7 +208,7 @@ def _release_inventory(
         )
         if not report["valid"]:
             raise IntegrityError(
-                "VAO release descriptor failed full 0.4.0 conformance: "
+                "VAO release descriptor failed reference conformance: "
                 + (report["stderr"] or report["stdout"])
             )
     from .vao import strict_json
@@ -217,8 +224,9 @@ def _release_inventory(
         if isinstance(publication.get("rootRecord"), dict)
         else {}
     )
-    return {
+    inventory = {
         item.get("fileIdentifier"): item
         for item in root.get("files", [])
         if isinstance(item, dict) and item.get("fileIdentifier")
     }
+    return release, inventory

@@ -3,6 +3,20 @@
 All notable changes to VAO CLI are recorded here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.3.0 — 2026-08-28
+
+- Adds VAO 0.5.0 candidate validation while retaining VAO 0.4.0 support.
+- Resolves a release-declared bootstrap carrier by default and a preservation closure
+  with `download --complete`.
+- Retrieves `carrier-member` realizations from another carrier on the same exact
+  Zenodo version record through verified HTTP ranges.
+- Adds `materialize` for building validated custom carriers from explicit IDs,
+  asset-group closures, or semantic filters without downloading an entire source
+  carrier.
+- Stages the VAO 0.5 single-record profile with one bootstrap carrier, one
+  preservation-closure carrier, a standalone manifest, checksums, and an optional
+  `README.pdf`.
+
 ## 0.2.0 — 2026-08-27
 
 First public-release candidate.

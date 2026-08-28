@@ -5,9 +5,19 @@ from email.message import Message
 from io import BytesIO
 from pathlib import Path
 
-from tests.support import MemoryHTTP, MemoryZenodoClient, make_pack_vao, make_vao
+from tests.support import (
+    MemoryHTTP,
+    MemoryZenodoClient,
+    MultiFileMemoryZenodoClient,
+    make_pack_vao,
+    make_two_carrier_vao,
+    make_vao,
+)
+from vao_cli.download import select_vao_files
 from vao_cli.fetch import fetch_realization
 from vao_cli.group_fetch import fetch_group
+from vao_cli.local import validate_local_carrier
+from vao_cli.materialize import materialize_carrier
 from vao_cli.models import PRODUCTION, RemoteFile, ResolvedRecord
 from vao_cli.remote_zip import RemoteZipReader
 from vao_cli.resolver import VAOResolver
@@ -99,6 +109,75 @@ class RemoteTests(unittest.TestCase):
             self.assertEqual(output.read_bytes(), payload)
             self.assertEqual(report["delivery"], "repository")
             self.assertEqual(report["distributionDOI"], "10.5281/zenodo.2")
+
+    def test_fetches_member_from_preservation_carrier_by_range(self):
+        files, _release, identifier, payload = make_two_carrier_vao()
+        client = MultiFileMemoryZenodoClient(files)
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "preservation.flac"
+            report = fetch_realization(
+                client,
+                "10.5281/zenodo.1",
+                identifier,
+                output,
+                conformance=False,
+            )
+            self.assertEqual(output.read_bytes(), payload)
+            self.assertEqual(report["delivery"], "carrier-member")
+            self.assertEqual(report["carrierFile"], "complete.vao")
+            self.assertEqual(report["verification"]["outerCarrier"], "not-fully-read")
+            complete_url = next(
+                url
+                for url in client.http.values
+                if url.endswith("complete.vao/content")
+            )
+            complete_ranges = [
+                (start, end)
+                for url, start, end in client.http.ranges
+                if url == complete_url
+            ]
+            self.assertTrue(complete_ranges)
+            self.assertNotIn((0, len(files["complete.vao"]) - 1), complete_ranges)
+
+    def test_two_carrier_download_modes_are_unambiguous(self):
+        files, release, _identifier, _payload = make_two_carrier_vao()
+        client = MultiFileMemoryZenodoClient(files)
+        remote = client.files(client.record)
+        bootstrap = select_vao_files(
+            remote,
+            release,
+            file_key=None,
+            all_files=False,
+            complete=False,
+        )
+        complete = select_vao_files(
+            remote,
+            release,
+            file_key=None,
+            all_files=False,
+            complete=True,
+        )
+        self.assertEqual([item.key for item in bootstrap], ["bootstrap.vao"])
+        self.assertEqual([item.key for item in complete], ["complete.vao"])
+
+    def test_materializes_a_verified_custom_carrier(self):
+        files, _release, identifier, payload = make_two_carrier_vao()
+        client = MultiFileMemoryZenodoClient(files)
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "selected.vao"
+            report = materialize_carrier(
+                client,
+                "10.5281/zenodo.1",
+                output,
+                realization_ids=[identifier],
+                conformance=False,
+            )
+            self.assertTrue(report["verified"])
+            self.assertEqual(report["realizationCount"], 1)
+            local = validate_local_carrier(output, verify_payloads=True)
+            self.assertTrue(local["valid"], local["errors"])
+            self.assertEqual(local["carrier"]["carrierMode"], "custom")
+            self.assertEqual(local["verifiedPayloadBytes"], len(payload))
 
     def test_transactionally_fetches_asset_group(self):
         data, _manifest, payload = make_vao()

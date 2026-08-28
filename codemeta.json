@@ -3,11 +3,11 @@
   "@type": "SoftwareSourceCode",
   "name": "VAO CLI",
   "identifier": "https://doi.org/10.5281/zenodo.22133810",
-  "version": "0.2.0",
-  "datePublished": "2026-08-27",
+  "version": "0.3.0",
+  "datePublished": "2026-08-28",
   "description": "Reference command-line client for resolving, validating, and selectively acquiring Virtual Acoustic Objects.",
   "codeRepository": "https://github.com/modavis-project/vao-cli",
-  "downloadUrl": "https://github.com/modavis-project/vao-cli/releases/tag/v0.2.0",
+  "downloadUrl": "https://github.com/modavis-project/vao-cli/releases/tag/v0.3.0",
   "issueTracker": "https://github.com/modavis-project/vao-cli/issues",
   "license": "https://spdx.org/licenses/Apache-2.0",
   "programmingLanguage": "Python",
@@ -33,7 +33,7 @@
   "isBasedOn": {
     "@type": "CreativeWork",
     "name": "Virtual Acoustic Object (VAO) Standard",
-    "version": "0.4.0",
-    "identifier": "https://doi.org/10.5281/zenodo.22122774"
+    "version": "0.5.0 candidate",
+    "identifier": "https://github.com/modavis-project/vao-standard/tree/main"
   }
 }

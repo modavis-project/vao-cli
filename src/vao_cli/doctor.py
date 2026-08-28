@@ -29,25 +29,25 @@ def run_doctor(
     add("Persistent cache", True, str(cache.path), required=False)
     add("VAO standard checkout", root is not None, str(root) if root else "not found")
     add(
-        "VAO 0.4 validator",
-        bool(root and (root / "Tools" / "vao04.py").is_file()),
-        str(root / "Tools" / "vao04.py") if root else "not found",
+        "VAO 0.5 validator",
+        bool(root and (root / "Tools" / "vao05.py").is_file()),
+        str(root / "Tools" / "vao05.py") if root else "not found",
     )
     add(
-        "VAO 0.4 schemas",
-        bool(root and (root / "Schemas" / "vao-manifest-0.4.0.schema.json").is_file()),
+        "VAO 0.5 schemas",
+        bool(root and (root / "Schemas" / "vao-manifest-0.5.0.schema.json").is_file()),
         str(root / "Schemas") if root else "not found",
     )
     if root:
         probe = subprocess.run(
-            [sys.executable, str(root / "Tools" / "vao04.py"), "--help"],
+            [sys.executable, str(root / "Tools" / "vao05.py"), "--help"],
             cwd=root,
             text=True,
             capture_output=True,
             check=False,
         )
         add(
-            "VAO 0.4 validator runtime",
+            "VAO 0.5 validator runtime",
             probe.returncode == 0,
             "runnable"
             if probe.returncode == 0
