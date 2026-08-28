@@ -1,5 +1,8 @@
 # VAO CLI
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22133810.svg)](https://doi.org/10.5281/zenodo.22133810)
+[![VAO 0.4.0 persistent identifier](https://img.shields.io/badge/W3ID-VAO%200.4.0-2C5F73.svg)](https://w3id.org/modavis/vao/0.4.0/)
+
 VAO CLI is a reference command-line client for the
 [Virtual Acoustic Object (VAO) Standard 0.4.0](https://doi.org/10.5281/zenodo.22122774).
 It resolves DOI-identified VAOs, inspects their semantic inventory, selects exact
@@ -212,6 +215,12 @@ VAO CLI is maintained by **Dominik Ukolov**, Digital Humanities (Image/Object),
 Friedrich Schiller University Jena; also Research Group DIGITAL ORGANOLOGY, Leipzig
 University. Affiliations identify the developer and do not imply institutional
 endorsement.
+
+This work was developed as part of the **MODAVIS** doctoral research project
+(2022–2026). Dominik Ukolov's doctoral research was supported by the German
+Academic Scholarship Foundation (*Studienstiftung des deutschen Volkes*).
+Funding and affiliations do not imply endorsement of the project's technical
+or scientific claims.
 
 The software and documentation in this repository are licensed under
 [Apache License 2.0](LICENSE). The VAO standard is a separate, cited work with its own
