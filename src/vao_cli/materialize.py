@@ -99,6 +99,7 @@ def materialize_carrier(
     }
     complete_groups = _complete_groups(manifest, set(selected_ids))
     descriptor = {
+        "$schema": f"https://w3id.org/modavis/vao/{manifest['formatVersion']}/schema/carrier.json",
         "id": carrier_id,
         "formatVersion": manifest["formatVersion"],
         "type": "VAOCarrier",

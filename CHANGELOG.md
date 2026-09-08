@@ -3,6 +3,15 @@
 All notable changes to VAO CLI are recorded here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.3.1 — Unreleased
+
+- Include the version-matched schema identifier in custom carrier descriptors.
+  Without it, materialization could retrieve valid payloads but fail its final
+  reference validation instead of producing a carrier.
+- Exercise custom materialization against the released VAO 0.5.0 fixture with
+  conformance enabled, including exact preservation of the manifest bytes.
+- Update compatibility references to the published VAO Standard 0.5.0.
+
 ## 0.3.0 — 2026-08-28
 
 - Adds VAO 0.5.0 candidate validation while retaining VAO 0.4.0 support.

@@ -13,6 +13,7 @@ from vao_cli.local import (
     run_reference_validator,
     validate_local_carrier,
 )
+from vao_cli.materialize import materialize_carrier
 from vao_cli.publication import prepare_publication
 from vao_cli.resolver import VAOResolver
 
@@ -90,3 +91,29 @@ def test_publication_templates_conform_for_released_fixture() -> None:
         assert report["readyForLivePublication"] is False
         assert report["descriptorConformance"]["release"]["valid"] is True
         assert report["descriptorConformance"]["zenodoMetadata"]["valid"] is True
+
+
+def test_custom_carrier_conforms_to_released_vao_05(tmp_path: Path) -> None:
+    root = _standard_root()
+    fixture = root / "Fixtures" / "VAO05" / "carriers" / "minimal.vao"
+    with zipfile.ZipFile(fixture) as archive:
+        manifest_bytes = archive.read("vao-manifest.json")
+        manifest = json.loads(manifest_bytes)
+    output = tmp_path / "custom.vao"
+    report = materialize_carrier(
+        MemoryZenodoClient(fixture.read_bytes()),
+        "10.5281/zenodo.1",
+        output,
+        realization_ids=[manifest["realizations"][0]["id"]],
+        standard_root=root,
+    )
+    assert report["verified"] is True
+    assert report["referenceConformance"]["valid"] is True
+    with zipfile.ZipFile(output) as archive:
+        assert archive.read("vao-manifest.json") == manifest_bytes
+        descriptor = json.loads(archive.read("META-INF/vao-carrier.json"))
+    assert (
+        descriptor["$schema"]
+        == "https://w3id.org/modavis/vao/0.5.0/schema/carrier.json"
+    )
+    assert descriptor["carrierMode"] == "custom"

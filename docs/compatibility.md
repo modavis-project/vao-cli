@@ -7,11 +7,13 @@ permalink: /compatibility/
 
 ## Supported standard
 
-VAO CLI 0.3.0 supports the published
-[VAO Standard 0.4.0](https://doi.org/10.5281/zenodo.22122774) and the 0.5.0 candidate in
-the standard repository. Full conformance dispatches to `vao04.py` or `vao05.py` from
+VAO CLI 0.3.1 supports the published
+[VAO Standard 0.4.0](https://doi.org/10.5281/zenodo.22122774) and
+[VAO Standard 0.5.0](https://doi.org/10.5281/zenodo.22214248).
+Full conformance dispatches to `vao04.py` or `vao05.py` from
 the selected checkout according to the document's own `formatVersion`. Compatibility
-tests retain the immutable VAO 0.4 fixture and add VAO 0.5 two-carrier behavior.
+tests retain the immutable VAO 0.4 fixture and exercise VAO 0.5 two-carrier behavior
+and custom materialization against the released reference fixture.
 
 VAO 0.3.3 support is limited to explicitly requested structural inspection. Version
 0.3.3 was an unpublished development boundary retained by the standard for migration
@@ -19,7 +21,7 @@ testing; the CLI does not describe it as a current public format.
 
 ## Implemented roles
 
-| VAO role | Scope in VAO CLI 0.3.0 |
+| VAO role | Scope in VAO CLI 0.3.1 |
 | --- | --- |
 | Reader | Interprets a manifest only after version-matched validation unless the operator explicitly selects `--no-conformance`. |
 | Validator | Combines bounded local carrier checks with the released authoritative reference validator. The CLI's local checks alone are not a VAO conformance claim. |

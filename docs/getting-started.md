@@ -30,9 +30,9 @@ The standard checkout supplies the normative schemas and reference implementatio
 VAO CLI accepts `--standard-root` for a single command when an environment variable is
 not appropriate.
 
-The reference validator is executed from this checkout. Use the signed `v0.4.0` tag for
-final VAO 0.4 work. For a VAO 0.5 release candidate, pin and record the reviewed standard
-commit. Do not point `VAO_STANDARD_ROOT` at an untrusted directory.
+The reference validator is executed from this checkout. Use the signed `v0.5.0` tag,
+which retains the VAO 0.4 validator, and record the exact checkout commit.
+Do not point `VAO_STANDARD_ROOT` at an untrusted directory.
 
 ## Validate the released fixture
 

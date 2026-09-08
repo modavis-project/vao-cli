@@ -37,8 +37,8 @@ The CLI accepts no Zenodo token and implements no mutation endpoint.
 Full conformance executes the version-matched `Tools/vao04.py` or `Tools/vao05.py` from
 the configured VAO Standard checkout.
 That checkout is trusted executable code, not untrusted VAO input. Operators should use
-the signed `v0.4.0` release for final 0.4 work and a reviewed, pinned commit for the 0.5
-candidate. `VAO_STANDARD_ROOT` must not identify an untrusted or writable third-party
+the signed `v0.5.0` release, which retains the VAO 0.4 validator, and record its commit.
+`VAO_STANDARD_ROOT` must not identify an untrusted or writable third-party
 directory.
 
 ## Archive boundary

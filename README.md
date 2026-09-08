@@ -1,7 +1,7 @@
 # VAO CLI
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22133810.svg)](https://doi.org/10.5281/zenodo.22133810)
-[![VAO 0.5.0 candidate](https://img.shields.io/badge/VAO-0.5.0%20candidate-2C5F73.svg)](https://github.com/modavis-project/vao-standard)
+[![VAO 0.5.0](https://img.shields.io/badge/VAO-0.5.0-2C5F73.svg)](https://doi.org/10.5281/zenodo.22214248)
 
 VAO CLI is a reference command-line client for the
 [Virtual Acoustic Object (VAO) Standard](https://github.com/modavis-project/vao-standard).
@@ -18,14 +18,14 @@ exact `carrier-member` retrieval required by large, dynamic datasets.
 > delete Zenodo records. Its publication command only prepares a blocked local review
 > package.
 
-## Current release
+## Current source version
 
 | Component | Version |
 | --- | --- |
-| VAO CLI | 0.3.0 |
-| Supported VAO versions | 0.4.0 final; 0.5.0 candidate |
+| VAO CLI | 0.3.1 (patch pending release) |
+| Supported VAO versions | 0.4.0 final; 0.5.0 final |
 | Python | 3.11 or newer |
-| Release DOI | [10.5281/zenodo.22133810](https://doi.org/10.5281/zenodo.22133810) |
+| Software archive DOI | [10.5281/zenodo.22133810](https://doi.org/10.5281/zenodo.22133810) |
 
 Legacy VAO 0.3.3 manifests may be inspected with explicitly limited structural checks.
 No 0.3 draft is presented as a current standard or as later-version conformance.
@@ -92,8 +92,8 @@ root. For tests and development tools, use `python -m pip install -e '.[dev]'`.
 
 The standard checkout supplies the normative schemas and reference validator; the CLI
 package supplies their Python runtime dependencies. Treat that checkout as executable
-code. Use the signed `v0.4.0` tag for final VAO 0.4 validation; pin and review the
-standard commit used for a VAO 0.5 release candidate.
+code. Use the signed `v0.5.0` tag, which includes the version-matched validators
+and fixtures for both supported formats, and record the checkout commit in test logs.
 
 ## First validation
 

@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: modavis-project/vao-standard
-          ref: v0.4.0
+          ref: v0.5.0
           path: _vendor/vao-standard
           fetch-depth: 0
           persist-credentials: false
@@ -43,8 +43,8 @@ jobs:
       - name: Verify the signed VAO Standard release
         run: |
           printf '%s\n' 'modavis-project@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC0hRn2syRAD3vCm9MLm766FprDF3GfVMVmj5C2wYPkk' > "$RUNNER_TEMP/vao-standard-allowed-signers"
-          git -C _vendor/vao-standard -c gpg.ssh.allowedSignersFile="$RUNNER_TEMP/vao-standard-allowed-signers" verify-tag v0.4.0
-          test "$(tr -d '\n' < _vendor/vao-standard/VERSION)" = "0.4.0"
+          git -C _vendor/vao-standard -c gpg.ssh.allowedSignersFile="$RUNNER_TEMP/vao-standard-allowed-signers" verify-tag v0.5.0
+          test "$(tr -d '\n' < _vendor/vao-standard/VERSION)" = "0.5.0"
       - name: Run the release gate
         env:
           VAO_STANDARD_ROOT: ${{ github.workspace }}/_vendor/vao-standard

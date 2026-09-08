@@ -7,7 +7,7 @@ permalink: /
 
 VAO CLI is the reference command-line client for the
 [VAO Standard](https://github.com/modavis-project/vao-standard). It supports final VAO
-0.4.0 and the VAO 0.5.0 candidate, dispatches to the matching reference validator, and
+0.4.0 and 0.5.0, dispatches to the matching reference validator, and
 retrieves exact realizations without requiring a complete carrier download. It can also
 assemble a validated custom carrier from any selected subset.
 
