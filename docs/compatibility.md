@@ -7,7 +7,7 @@ permalink: /compatibility/
 
 ## Supported standard
 
-VAO CLI 0.4.0 supports the published
+VAO CLI 0.4.1 supports the published
 [VAO Standard 0.4.0](https://doi.org/10.5281/zenodo.22122774),
 [VAO Standard 0.5.0](https://doi.org/10.5281/zenodo.22214248), and
 [VAO Standard 0.6.0](https://doi.org/10.5281/zenodo.23287792).
@@ -23,7 +23,7 @@ testing; the CLI does not describe it as a current public format.
 
 ## Implemented roles
 
-| VAO role | Scope in VAO CLI 0.4.0 |
+| VAO role | Scope in VAO CLI 0.4.1 |
 | --- | --- |
 | Reader | Interprets a manifest only after version-matched validation unless the operator explicitly selects `--no-conformance`. |
 | Validator | Combines bounded local carrier checks with the released authoritative reference validator. The CLI's local checks alone are not a VAO conformance claim. |

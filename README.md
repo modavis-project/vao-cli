@@ -1,6 +1,6 @@
 # VAO CLI
 
-[![VAO CLI 0.4.0](https://img.shields.io/badge/CLI-0.4.0-2C5F73.svg)](https://github.com/modavis-project/vao-cli/releases/tag/v0.4.0)
+[![VAO CLI 0.4.1](https://img.shields.io/badge/CLI-0.4.1-2C5F73.svg)](https://github.com/modavis-project/vao-cli/releases/tag/v0.4.1)
 [![VAO 0.6.0](https://img.shields.io/badge/VAO-0.6.0-2C5F73.svg)](https://doi.org/10.5281/zenodo.23287792)
 
 VAO CLI is a reference command-line client for the
@@ -23,7 +23,7 @@ claimed level separately.
 
 | Component | Version |
 | --- | --- |
-| VAO CLI | [0.4.0](https://github.com/modavis-project/vao-cli/releases/tag/v0.4.0) |
+| VAO CLI | [0.4.1](https://github.com/modavis-project/vao-cli/releases/tag/v0.4.1) |
 | Supported VAO versions | 0.4.0, 0.5.0, 0.6.0 |
 | Python | 3.11 or newer |
 
@@ -74,12 +74,12 @@ Run `vao COMMAND --help` for the complete options of a command.
 ## Installation
 
 VAO CLI requires both the Python package and a trusted checkout of the released VAO
-Standard. Download the wheel from the [0.4.0 release](https://github.com/modavis-project/vao-cli/releases/tag/v0.4.0), then install it in a virtual environment:
+Standard. Download the wheel from the [0.4.1 release](https://github.com/modavis-project/vao-cli/releases/tag/v0.4.1), then install it in a virtual environment:
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install ./vao_cli-0.4.0-py3-none-any.whl
+python -m pip install ./vao_cli-0.4.1-py3-none-any.whl
 
 git clone --branch v0.6.0 https://github.com/modavis-project/vao-standard.git
 export VAO_STANDARD_ROOT="$(cd vao-standard && pwd)"

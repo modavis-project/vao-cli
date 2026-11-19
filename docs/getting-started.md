@@ -15,7 +15,7 @@ permalink: /getting-started/
 
 ```sh
 git clone --branch v0.6.0 https://github.com/modavis-project/vao-standard.git
-git clone --branch v0.4.0 https://github.com/modavis-project/vao-cli.git
+git clone --branch v0.4.1 https://github.com/modavis-project/vao-cli.git
 
 cd vao-cli
 python3 -m venv .venv

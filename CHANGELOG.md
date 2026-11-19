@@ -3,7 +3,11 @@
 All notable changes to VAO CLI are recorded here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## 0.4.0 — 2026-11-19
+## 0.4.1 — 2026-11-19
+
+- Update the locked build and release dependencies for certifi, setuptools, and urllib3.
+
+## 0.4.0 — working tag, 2026-11-19
 
 - Validate VAO 0.6.0 manifests and carriers with the signed standard checkout.
 - Report each claimed MMIC 1.0.0 validation level, including inputs missing from a

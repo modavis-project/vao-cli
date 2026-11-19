@@ -10,7 +10,7 @@ body:
     id: version
     attributes:
       label: VAO CLI and VAO Standard versions
-      placeholder: VAO CLI 0.4.0 / VAO Standard 0.6.0
+      placeholder: VAO CLI 0.4.1 / VAO Standard 0.6.0
     validations:
       required: true
   - type: textarea
