@@ -21,8 +21,16 @@ keywords:
 abstract: >-
   VAO CLI is a reference command-line client for resolving, inspecting,
   validating, and selectively acquiring Virtual Acoustic Objects conforming
-  to VAO 0.4.0 and VAO 0.5.0.
+  to VAO 0.4.0, VAO 0.5.0, and VAO 0.6.0.
 references:
+  - type: software
+    title: "Virtual Acoustic Object (VAO) Standard"
+    version: "0.6.0"
+    doi: "10.5281/zenodo.23287792"
+    url: "https://github.com/modavis-project/vao-standard/tree/v0.6.0"
+    authors:
+      - family-names: Ukolov
+        given-names: Dominik
   - type: software
     title: "Virtual Acoustic Object (VAO) Standard"
     version: "0.5.0"

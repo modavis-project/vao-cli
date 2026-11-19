@@ -6,7 +6,7 @@ Contributions to the client, tests, and documentation are welcome.
 
 Search existing issues and read the [architecture](docs/ARCHITECTURE.md),
 [security model](docs/security.md), and the normative
-[VAO Standard 0.4.0](https://doi.org/10.5281/zenodo.22122774). Security vulnerabilities
+[VAO Standard 0.6.0](https://doi.org/10.5281/zenodo.23287792). Security vulnerabilities
 must follow [SECURITY.md](SECURITY.md), not a public issue.
 
 Changes that interpret VAO semantics should identify the relevant normative rule,
@@ -21,7 +21,7 @@ python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --require-hashes -r requirements-lock.txt
 python -m pip install --no-deps --no-build-isolation -e .
-export VAO_STANDARD_ROOT=/path/to/vao-standard-v0.4.0
+export VAO_STANDARD_ROOT=/path/to/vao-standard-v0.6.0
 python tools/check_release.py
 ```
 

@@ -175,35 +175,43 @@ def check_standard_fixture(environment: dict[str, str]) -> None:
     from vao_cli.local import ensure_reference_validator
 
     root = ensure_reference_validator()
-    fixture = root / "Fixtures" / "VAO04" / "carriers" / "minimal.vao"
-    if not fixture.is_file():
-        raise SystemExit("Released VAO 0.4.0 minimal carrier fixture is missing")
-    command = [
-        sys.executable,
-        "-m",
-        "vao_cli",
-        "--json",
-        "validate",
-        str(fixture),
-    ]
-    print("+", " ".join(command), flush=True)
-    process = subprocess.run(
-        command,
-        cwd=ROOT,
-        env=environment,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if process.returncode != 0:
-        sys.stderr.write(process.stdout)
-        sys.stderr.write(process.stderr)
-        raise SystemExit("Published VAO 0.4.0 fixture validation failed")
-    report = json.loads(process.stdout)
-    if not report.get("valid") or not report.get("referenceConformance", {}).get(
-        "valid"
-    ):
-        raise SystemExit("Published VAO 0.4.0 fixture lacks full conformance")
+    fixtures = {
+        "0.4.0": "Fixtures/VAO04/carriers/minimal.vao",
+        "0.5.0": "Fixtures/VAO05/carriers/minimal.vao",
+        "0.6.0": "Fixtures/MMIC/1.0.0/roll/preservation-closure.vao",
+    }
+    for version, relative in fixtures.items():
+        fixture = root / relative
+        if not fixture.is_file():
+            raise SystemExit(f"Released VAO {version} carrier fixture is missing")
+        command = [sys.executable, "-m", "vao_cli", "--json", "validate", str(fixture)]
+        print("+", " ".join(command), flush=True)
+        process = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if process.returncode != 0:
+            sys.stderr.write(process.stdout)
+            sys.stderr.write(process.stderr)
+            raise SystemExit(f"Published VAO {version} fixture validation failed")
+        report = json.loads(process.stdout)
+        reference = report.get("referenceConformance", {})
+        if (
+            not report.get("valid")
+            or not reference.get("valid")
+            or reference.get("standardVersion") != version
+        ):
+            raise SystemExit(
+                f"Published VAO {version} fixture lacks reference conformance"
+            )
+        if version == "0.6.0" and reference["validation"]["mmic"]["status"] != "valid":
+            raise SystemExit(
+                "The published MMIC 1.0.0 fixture lacks domain conformance"
+            )
 
 
 def main() -> int:

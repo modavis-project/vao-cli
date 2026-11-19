@@ -162,6 +162,7 @@ class VAOResolver:
                         ),
                         standard_root=standard_root,
                         required=True,
+                        manifest_raw=source_manifest_raw,
                     )
                     if not release_conformance["valid"]:
                         raise IntegrityError(

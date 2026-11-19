@@ -9,6 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from . import VAO_STANDARD_VERSIONS
 from .errors import IntegrityError, ResolutionError, UnsupportedError
 from .local import (
     run_reference_descriptor_bytes,
@@ -96,7 +97,11 @@ def fetch_realization(
             )
         if release_raw is not None:
             release_conformance = run_reference_descriptor_bytes(
-                "release", release_raw, standard_root=standard_root, required=True
+                "release",
+                release_raw,
+                standard_root=standard_root,
+                required=True,
+                manifest_raw=manifest_raw,
             )
             if not release_conformance["valid"]:
                 raise IntegrityError(
@@ -636,6 +641,13 @@ def _pack_plan(
         raise IntegrityError(
             "Pack manifest releaseId disagrees with the root VAO release"
         )
+    if (
+        manifest.get("formatVersion") == "0.6.0"
+        and pack_manifest.get("formatVersion") != manifest["formatVersion"]
+    ):
+        raise IntegrityError(
+            "Pack manifest formatVersion disagrees with the VAO manifest"
+        )
     member_path = distribution.get("memberPath")
     members = [
         item
@@ -751,10 +763,10 @@ def _validate_pack_manifest(
     raw: bytes, *, conformance: bool, standard_root: Path | None
 ) -> dict[str, Any]:
     value = strict_json(raw, "VAO pack manifest")
-    if value.get("type") != "VAOPackManifest" or value.get("formatVersion") not in {
-        "0.4.0",
-        "0.5.0",
-    }:
+    if (
+        value.get("type") != "VAOPackManifest"
+        or value.get("formatVersion") not in VAO_STANDARD_VERSIONS
+    ):
         raise IntegrityError("Pack manifest is not a supported VAO version")
     if value.get("rejectUnlistedMembers") is not True or not isinstance(
         value.get("members"), list

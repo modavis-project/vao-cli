@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
+from . import VAO_STANDARD_VERSIONS
 from .cache import PersistentCache
 from .catalog import DEFAULT_COMMUNITY
 from .errors import VAOCLIError
-from .local import find_vao_standard_root
+from .local import ensure_reference_validator, find_vao_standard_root
 from .zenodo import ZenodoClient
 
 
@@ -28,31 +28,17 @@ def run_doctor(
     add("Python", sys.version_info >= (3, 11), sys.version.split()[0])
     add("Persistent cache", True, str(cache.path), required=False)
     add("VAO standard checkout", root is not None, str(root) if root else "not found")
-    add(
-        "VAO 0.5 validator",
-        bool(root and (root / "Tools" / "vao05.py").is_file()),
-        str(root / "Tools" / "vao05.py") if root else "not found",
-    )
-    add(
-        "VAO 0.5 schemas",
-        bool(root and (root / "Schemas" / "vao-manifest-0.5.0.schema.json").is_file()),
-        str(root / "Schemas") if root else "not found",
-    )
     if root:
-        probe = subprocess.run(
-            [sys.executable, str(root / "Tools" / "vao05.py"), "--help"],
-            cwd=root,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        add(
-            "VAO 0.5 validator runtime",
-            probe.returncode == 0,
-            "runnable"
-            if probe.returncode == 0
-            else probe.stderr.strip() or probe.stdout.strip(),
-        )
+        for version in VAO_STANDARD_VERSIONS:
+            name = f"VAO {version} validator"
+            try:
+                validator_root = ensure_reference_validator(root, version=version)
+            except VAOCLIError as exc:
+                add(name, False, str(exc))
+            else:
+                add(name, True, str(validator_root))
+        mmic_catalog = root / "Profiles" / "MMIC" / "1.0.0" / "dependencies.json"
+        add("MMIC 1.0.0 dependency catalog", mmic_catalog.is_file(), str(mmic_catalog))
     if network:
         try:
             community = client.community(DEFAULT_COMMUNITY)

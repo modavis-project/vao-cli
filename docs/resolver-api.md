@@ -25,7 +25,7 @@ integration interface, not a public edge service.
 | `GET /api/resolve/{doi}` | JSON record, manifest summary, assets, groups, community status, conformance, and warnings. |
 | `GET /api/resolve/{doi}/realization` | Verified realization bytes or a delivery plan. |
 
-Percent-encode a DOI when it is part of the path. On a VAO 0.5 record, the resolver uses
+Percent-encode a DOI when it is part of the path. On a two-carrier VAO 0.5.0 or 0.6.0 record, the resolver uses
 the bootstrap declared by `vao-release.json`; a `carrier-member` distribution can then
 lead to the preservation carrier. The optional `file` query parameter overrides the
 start carrier with an exact `.vao` file key.

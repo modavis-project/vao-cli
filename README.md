@@ -1,7 +1,7 @@
 # VAO CLI
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22133810.svg)](https://doi.org/10.5281/zenodo.22133810)
-[![VAO 0.5.0](https://img.shields.io/badge/VAO-0.5.0-2C5F73.svg)](https://doi.org/10.5281/zenodo.22214248)
+[![VAO 0.6.0](https://img.shields.io/badge/VAO-0.6.0-2C5F73.svg)](https://doi.org/10.5281/zenodo.23287792)
 
 VAO CLI is a reference command-line client for the
 [Virtual Acoustic Object (VAO) Standard](https://github.com/modavis-project/vao-standard).
@@ -11,8 +11,9 @@ custom local carriers from a published release.
 
 The client treats repository metadata, manifests, carriers, and payloads as distinct
 trust layers. Full conformance is delegated to the validator matching the manifest
-version. VAO 0.4.0 remains supported; VAO 0.5.0 adds the two-carrier Zenodo profile and
-exact `carrier-member` retrieval required by large, dynamic datasets.
+version. VAO 0.5.0 and 0.6.0 support exact `carrier-member` retrieval across a bootstrap
+and preservation carrier. The 0.6.0 validator reports MMIC 1.0.0 results for each
+claimed level separately.
 
 > The Zenodo integration is read-only. VAO CLI cannot create, edit, publish, submit, or
 > delete Zenodo records. Its publication command only prepares a blocked local review
@@ -22,8 +23,8 @@ exact `carrier-member` retrieval required by large, dynamic datasets.
 
 | Component | Version |
 | --- | --- |
-| VAO CLI | 0.3.1 (patch pending release) |
-| Supported VAO versions | 0.4.0 final; 0.5.0 final |
+| VAO CLI | 0.3.1 development source |
+| Supported VAO versions | 0.4.0, 0.5.0, 0.6.0 |
 | Python | 3.11 or newer |
 | Software archive DOI | [10.5281/zenodo.22133810](https://doi.org/10.5281/zenodo.22133810) |
 
@@ -82,7 +83,7 @@ python3 -m venv .venv
 git clone https://github.com/modavis-project/vao-cli.git
 python -m pip install ./vao-cli
 
-git clone https://github.com/modavis-project/vao-standard.git
+git clone --branch v0.6.0 https://github.com/modavis-project/vao-standard.git
 export VAO_STANDARD_ROOT="$(cd vao-standard && pwd)"
 vao doctor
 ```
@@ -92,8 +93,8 @@ root. For tests and development tools, use `python -m pip install -e '.[dev]'`.
 
 The standard checkout supplies the normative schemas and reference validator; the CLI
 package supplies their Python runtime dependencies. Treat that checkout as executable
-code. Use the signed `v0.5.0` tag, which includes the version-matched validators
-and fixtures for both supported formats, and record the checkout commit in test logs.
+code. Use the signed `v0.6.0` tag. It retains the 0.4.0 and 0.5.0 validators alongside
+the 0.6.0 validator, fixtures, and MMIC files.
 
 ## First validation
 
@@ -101,6 +102,7 @@ The standard repository includes a conforming synthetic carrier:
 
 ```sh
 vao validate "$VAO_STANDARD_ROOT/Fixtures/VAO04/carriers/minimal.vao"
+vao --json validate "$VAO_STANDARD_ROOT/Fixtures/MMIC/1.0.0/roll/preservation-closure.vao"
 ```
 
 `vao validate` runs bounded carrier and payload checks followed by the authoritative
@@ -171,10 +173,10 @@ vao publication prepare object-bootstrap.vao object-preservation.vao \
 Metadata application leaves the input untouched, creates a new release identifier,
 increments the revision, records the superseded release, updates the exact carrier
 binding, and requires the resulting carrier to pass the 0.4.0 reference validator.
-For VAO 0.5, use `materialize`; the metadata revision command does not rewrite a
-published 0.5 manifest.
+For VAO 0.5.0 and 0.6.0, `materialize` keeps the original manifest bytes and writes a
+new carrier descriptor.
 
-Publication preparation creates checksums and schema-valid draft descriptors in a
+Publication preparation supports VAO 0.4.0 and 0.5.0. It creates checksums and schema-valid draft descriptors in a
 local directory. Pending repository identifiers, current Zenodo metadata review,
 rights, consent, privacy, and access decisions keep the readiness state false. Nothing
 is sent to Zenodo.

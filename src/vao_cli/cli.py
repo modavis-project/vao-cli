@@ -689,6 +689,31 @@ def _file_dict(item) -> dict[str, Any]:
     }
 
 
+def _emit_reference_status(terminal: Terminal, reference: dict[str, Any]) -> None:
+    version = reference["standardVersion"]
+    validation = reference.get("validation", {})
+    if reference["valid"]:
+        print(terminal.success(f"VAO {version} reference checks passed"))
+    else:
+        print(terminal.failure(f"VAO {version} reference checks failed"))
+        detail = (
+            "\n".join(validation.get("errors", []))
+            or reference["stderr"]
+            or reference["stdout"]
+        )
+        if detail:
+            print(detail)
+    mmic = validation.get("mmic")
+    if mmic and mmic["status"] != "absent":
+        levels = ", ".join(
+            f"{level} {status}" for level, status in mmic.get("levels", {}).items()
+        )
+        detail = f" ({levels})" if levels else ""
+        print(
+            f"MMIC {mmic.get('specificationVersion', 'profile')} {mmic['status']}{detail}"
+        )
+
+
 def _emit_human(args: argparse.Namespace, value: Any) -> None:
     terminal = Terminal(color=not args.no_color, quiet=args.quiet)
     if args.command == "resolve":
@@ -722,12 +747,7 @@ def _emit_human(args: argparse.Namespace, value: Any) -> None:
             else terminal.warning(f"Official VAO community: {status}")
         )
         if value.get("conformance"):
-            standard_version = value["conformance"].get("standardVersion", "unknown")
-            print(
-                terminal.success(f"Full VAO {standard_version} reference conformance")
-                if value["conformance"]["valid"]
-                else terminal.failure(f"VAO {standard_version} conformance failed")
-            )
+            _emit_reference_status(terminal, value["conformance"])
         if summary:
             print(
                 f"VAO {summary['formatVersion']}  {summary['title']}\n"
@@ -857,6 +877,8 @@ def _emit_human(args: argparse.Namespace, value: Any) -> None:
             print(
                 f"Downloaded {item['file']} -> {item['output']} ({human_size(item['byteSize'])})"
             )
+            if item.get("referenceConformance", {}).get("standardVersion") == "0.6.0":
+                _emit_reference_status(terminal, item["referenceConformance"])
     elif args.command == "materialize":
         verb = "Would materialize" if value["dryRun"] else "Materialized"
         print(
@@ -871,6 +893,9 @@ def _emit_human(args: argparse.Namespace, value: Any) -> None:
             print(
                 f"Carrier size: {human_size(value['byteSize'])}  SHA-256: {value['sha256']}"
             )
+            reference = value.get("referenceConformance")
+            if reference and reference["standardVersion"] == "0.6.0":
+                _emit_reference_status(terminal, reference)
     elif args.command == "relations":
         print(
             table(
@@ -914,15 +939,7 @@ def _emit_human(args: argparse.Namespace, value: Any) -> None:
                 )
             )
         else:
-            reference = value.get("referenceConformance")
-            standard_version = reference.get("standardVersion", "unknown")
-            if reference["valid"]:
-                print(terminal.success(f"VAO {standard_version} reference conformance"))
-            else:
-                print(terminal.failure(f"VAO {standard_version} reference conformance"))
-                detail = reference.get("stderr") or reference.get("stdout")
-                if detail:
-                    print(detail)
+            _emit_reference_status(terminal, value["referenceConformance"])
     elif args.command == "extract":
         print(terminal.success(f"Extracted {value['realizationId']}"))
         print(

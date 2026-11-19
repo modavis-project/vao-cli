@@ -8,12 +8,14 @@ permalink: /compatibility/
 ## Supported standard
 
 VAO CLI 0.3.1 supports the published
-[VAO Standard 0.4.0](https://doi.org/10.5281/zenodo.22122774) and
-[VAO Standard 0.5.0](https://doi.org/10.5281/zenodo.22214248).
-Full conformance dispatches to `vao04.py` or `vao05.py` from
-the selected checkout according to the document's own `formatVersion`. Compatibility
-tests retain the immutable VAO 0.4 fixture and exercise VAO 0.5 two-carrier behavior
-and custom materialization against the released reference fixture.
+[VAO Standard 0.4.0](https://doi.org/10.5281/zenodo.22122774),
+[VAO Standard 0.5.0](https://doi.org/10.5281/zenodo.22214248), and
+[VAO Standard 0.6.0](https://doi.org/10.5281/zenodo.23287792).
+The document’s `formatVersion` selects `vao04.py`, `vao05.py`, or `vao06.py`.
+For VAO 0.6.0, the JSON report includes the reference validator’s core result
+and its MMIC profile and level results. A manifest on its own usually reports
+MMIC inputs as `unmaterialized`. A selective carrier reports the levels that
+its embedded bytes support.
 
 VAO 0.3.3 support is limited to explicitly requested structural inspection. Version
 0.3.3 was an unpublished development boundary retained by the standard for migration
@@ -26,9 +28,9 @@ testing; the CLI does not describe it as a current public format.
 | Reader | Interprets a manifest only after version-matched validation unless the operator explicitly selects `--no-conformance`. |
 | Validator | Combines bounded local carrier checks with the released authoritative reference validator. The CLI's local checks alone are not a VAO conformance claim. |
 | Extractor | Validates carrier structure and exact embedded realization identity before atomic extraction. |
-| Materializer | Supports embedded, exact Zenodo repository, `pack-member`, and 0.5 `carrier-member` delivery, plus purpose-built local custom carriers with exact byte verification. |
+| Materializer | Supports embedded, exact Zenodo repository, `pack-member`, and `carrier-member` delivery for 0.5.0 and 0.6.0, plus purpose-built local custom carriers with exact byte verification. |
 | Repository projector | Produces schema-valid offline review templates for legacy 0.4 and the 0.5 two-carrier single-record profile; it performs no live repository mutation. |
-| Writer | Descriptive metadata revision is limited to 0.4. Custom 0.5 materialization preserves the published semantic manifest and changes only carrier population. |
+| Writer | Descriptive metadata revision is limited to 0.4. Custom materialization preserves the published semantic manifest and changes only carrier population. |
 
 The client does not claim linked-data projector, deterministic runtime, renderer, or
 scientific-verification roles.
@@ -77,6 +79,6 @@ or ontology-mediated scientific inference.
 ## Version policy
 
 CLI releases follow Semantic Versioning independently of the VAO format version. A
-CLI releases can support more than one VAO version, but every
+CLI release can support more than one VAO version, and every
 conformance report identifies the exact standard version used. Compatibility-affecting
 changes are recorded in [CHANGELOG.md](../CHANGELOG.md).

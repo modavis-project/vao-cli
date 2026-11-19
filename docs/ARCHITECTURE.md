@@ -7,8 +7,8 @@ permalink: /architecture/
 
 ## Resolution model
 
-VAO 0.4.0 supplies the original semantic and delivery layers; VAO 0.5.0 adds
-cross-carrier acquisition and a fixed two-carrier publication profile:
+VAO 0.5.0 introduced cross-carrier retrieval and a two-carrier Zenodo profile.
+VAO 0.6.0 keeps the same delivery model.
 
 ```text
 version DOI

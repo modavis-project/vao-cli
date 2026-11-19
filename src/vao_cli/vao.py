@@ -188,6 +188,8 @@ def basic_manifest_errors(manifest: dict[str, Any]) -> list[str]:
 def verify_carrier_binding(
     manifest_raw: bytes, manifest: dict[str, Any], carrier: dict[str, Any]
 ) -> None:
+    if carrier.get("formatVersion") != manifest.get("formatVersion"):
+        raise IntegrityError("Carrier and manifest formatVersion values disagree")
     expected = hashlib.sha256(manifest_raw).hexdigest()
     if carrier.get("manifestSHA256") != expected or carrier.get(
         "manifestByteSize"

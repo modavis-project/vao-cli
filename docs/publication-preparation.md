@@ -14,7 +14,7 @@ vao publication prepare object-bootstrap.vao object-preservation.vao \
   --output publication-review --copy-carrier
 ```
 
-For VAO 0.5, the command requires one `bootstrap` carrier and one
+Offline staging supports VAO 0.4.0 and 0.5.0. For VAO 0.5, the command requires one `bootstrap` carrier and one
 `preservation-closure` carrier. Both must embed byte-identical manifests and pass local
 integrity checks plus the VAO 0.5 reference validator. The older one-input VAO 0.4 path
 remains available. The command then creates:

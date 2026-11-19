@@ -14,7 +14,7 @@ permalink: /getting-started/
 ## Install
 
 ```sh
-git clone https://github.com/modavis-project/vao-standard.git
+git clone --branch v0.6.0 https://github.com/modavis-project/vao-standard.git
 git clone https://github.com/modavis-project/vao-cli.git
 
 cd vao-cli
@@ -30,14 +30,15 @@ The standard checkout supplies the normative schemas and reference implementatio
 VAO CLI accepts `--standard-root` for a single command when an environment variable is
 not appropriate.
 
-The reference validator is executed from this checkout. Use the signed `v0.5.0` tag,
-which retains the VAO 0.4 validator, and record the exact checkout commit.
+The reference validator runs from the signed `v0.6.0` checkout shown above. This tag
+includes the older validators. Record the exact commit when reproducing a result.
 Do not point `VAO_STANDARD_ROOT` at an untrusted directory.
 
 ## Validate the released fixture
 
 ```sh
 vao validate "$VAO_STANDARD_ROOT/Fixtures/VAO04/carriers/minimal.vao"
+vao --json validate "$VAO_STANDARD_ROOT/Fixtures/MMIC/1.0.0/roll/preservation-closure.vao"
 ```
 
 Successful output distinguishes local bounded checks from full, version-matched
@@ -78,7 +79,7 @@ The dry run reports the delivery type, member, compressed extent, and HTTP byte 
 The real operation writes a temporary output, verifies its declared identity, and then
 commits it atomically. Existing outputs are refused.
 
-On a VAO 0.5 two-carrier record, inspection starts with the release-declared bootstrap.
+On a two-carrier VAO 0.5.0 or 0.6.0 record, inspection starts with the release-declared bootstrap.
 If a requested realization lives only in the preservation closure, `fetch` follows its
 exact `carrier-member` binding and reads only the necessary carrier ranges.
 

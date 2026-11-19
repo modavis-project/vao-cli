@@ -170,6 +170,11 @@ local structure and integrity checks and makes no VAO conformance claim. `--no-p
 skips payload hashing in the local layer; unless structural-only mode is also selected,
 the reference validator still determines conformance.
 
+For a VAO 0.6.0 carrier, the report gives the core result and any MMIC 1.0.0
+level results. A bootstrap carrier can pass the checks for its available bytes
+and still report a level as `unmaterialized`. Revalidate the completed carrier
+to check the levels that require those bytes.
+
 ### `extract`
 
 ```text

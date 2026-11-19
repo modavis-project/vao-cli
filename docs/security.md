@@ -34,10 +34,11 @@ The CLI accepts no Zenodo token and implements no mutation endpoint.
 
 ## Reference-validator boundary
 
-Full conformance executes the version-matched `Tools/vao04.py` or `Tools/vao05.py` from
+Reference validation executes the version-matched `Tools/vao04.py`, `Tools/vao05.py`, or
+`Tools/vao06.py` from
 the configured VAO Standard checkout.
 That checkout is trusted executable code, not untrusted VAO input. Operators should use
-the signed `v0.5.0` release, which retains the VAO 0.4 validator, and record its commit.
+the signed `v0.6.0` release, which retains the 0.4.0 and 0.5.0 validators, and record its commit.
 `VAO_STANDARD_ROOT` must not identify an untrusted or writable third-party
 directory.
 

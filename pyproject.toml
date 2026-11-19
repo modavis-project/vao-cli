@@ -53,7 +53,7 @@ Documentation = "https://modavis-project.github.io/vao-cli/"
 Repository = "https://github.com/modavis-project/vao-cli"
 Issues = "https://github.com/modavis-project/vao-cli/issues"
 DOI = "https://doi.org/10.5281/zenodo.22133810"
-Standard = "https://doi.org/10.5281/zenodo.22122774"
+Standard = "https://doi.org/10.5281/zenodo.23287792"
 
 [project.scripts]
 vao = "vao_cli.cli:main"

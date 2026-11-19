@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import stat
 import subprocess
@@ -32,6 +33,11 @@ MAX_TOTAL_BYTES = 4 * 1024**4
 MAX_PATH_SEGMENTS = 128
 MAX_COMPRESSION_RATIO = 1_000
 RATIO_CHECK_MIN_BYTES = 64 * 1024 * 1024
+REFERENCE_TOOLS = {
+    "0.4.0": "vao04.py",
+    "0.5.0": "vao05.py",
+    "0.6.0": "vao06.py",
+}
 
 
 def safe_archive_path(name: str) -> bool:
@@ -191,8 +197,6 @@ def validate_local_carrier(
             manifest = strict_json(manifest_raw, MANIFEST_NAME)
             carrier = strict_json(carrier_raw, CARRIER_NAME)
             errors.extend(basic_manifest_errors(manifest))
-            if carrier.get("formatVersion") != manifest.get("formatVersion"):
-                errors.append("Carrier and manifest formatVersion values disagree")
             if carrier.get("type") != "VAOCarrier":
                 errors.append("Carrier descriptor has an incorrect type")
             if manifest.get("formatVersion") in VAO_STANDARD_VERSIONS and carrier.get(
@@ -414,11 +418,12 @@ def _standard_version(root: Path) -> str | None:
 
 
 def _tool_name(version: str) -> str:
-    if version == "0.4.0":
-        return "vao04.py"
-    if version == "0.5.0":
-        return "vao05.py"
-    raise ConfigurationError(f"No reference validator is available for VAO {version}")
+    try:
+        return REFERENCE_TOOLS[version]
+    except KeyError as exc:
+        raise ConfigurationError(
+            f"No reference validator is available for VAO {version}"
+        ) from exc
 
 
 def _document_version(raw: bytes, label: str) -> str:
@@ -509,12 +514,14 @@ def run_reference_validator(
     )
     if root is None:
         return None
-    command = [
-        sys.executable,
-        str(root / "Tools" / _tool_name(version)),
-        "validate",
-        str(path.resolve()),
-    ]
+    return _run_reference_validation(path, root, version)
+
+
+def _run_reference_validation(path: Path, root: Path, version: str) -> dict[str, Any]:
+    command = [sys.executable, str(root / "Tools" / _tool_name(version)), "validate"]
+    if version == "0.6.0":
+        command.append("--json")
+    command.append(str(path.resolve()))
     process = subprocess.run(
         command,
         cwd=root,
@@ -522,7 +529,32 @@ def run_reference_validator(
         capture_output=True,
         check=False,
     )
-    return _reference_report(process, command, root, version)
+    report = _reference_report(process, command, root, version)
+    if version == "0.6.0" and process.returncode in {0, 1}:
+        try:
+            validation = json.loads(process.stdout)
+        except ValueError as exc:
+            raise ConfigurationError(
+                "VAO 0.6.0 validator returned malformed JSON"
+            ) from exc
+        if (
+            not isinstance(validation, dict)
+            or validation.get("valid") is not report["valid"]
+            or (
+                report["valid"]
+                and (
+                    validation.get("formatVersion") != version
+                    or not isinstance(validation.get("conformanceStatus"), str)
+                )
+            )
+        ):
+            raise ConfigurationError(
+                "VAO 0.6.0 validator returned an inconsistent report"
+            )
+        report["validation"] = validation
+        if report["valid"]:
+            report["status"] = validation["conformanceStatus"]
+    return report
 
 
 def run_reference_manifest_validator(
@@ -543,20 +575,7 @@ def run_reference_manifest_validator(
     temporary = Path(temporary_name)
     try:
         temporary.write_bytes(manifest_raw)
-        command = [
-            sys.executable,
-            str(root / "Tools" / _tool_name(version)),
-            "validate",
-            str(temporary),
-        ]
-        process = subprocess.run(
-            command,
-            cwd=root,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        report = _reference_report(process, command, root, version)
+        report = _run_reference_validation(temporary, root, version)
         report["validator"] = f"VAO {version} reference validator"
         return report
     finally:
@@ -604,20 +623,44 @@ def run_reference_descriptor_bytes(
     *,
     standard_root: Path | None = None,
     required: bool = False,
+    manifest_raw: bytes | None = None,
 ) -> dict[str, Any] | None:
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f"vao-{kind}-", suffix=".json")
-    os.close(descriptor)
-    temporary = Path(temporary_name)
-    try:
-        temporary.write_bytes(raw)
+    with tempfile.TemporaryDirectory(prefix=f"vao-{kind}-") as temporary:
+        descriptor = Path(temporary) / "descriptor.json"
+        descriptor.write_bytes(raw)
+        if manifest_raw is not None and kind == "release":
+            version = _document_version(manifest_raw, "Remote VAO manifest")
+            if _document_version(raw, "Remote VAO release descriptor") != version:
+                raise IntegrityError(
+                    "Release descriptor formatVersion disagrees with the manifest"
+                )
+            if version == "0.6.0":
+                root = (
+                    ensure_reference_validator(standard_root, version=version)
+                    if required
+                    else find_vao_standard_root(standard_root, version=version)
+                )
+                if root is None:
+                    return None
+                manifest = Path(temporary) / MANIFEST_NAME
+                manifest.write_bytes(manifest_raw)
+                command = [
+                    sys.executable,
+                    str(root / "Tools" / _tool_name(version)),
+                    "validate-release",
+                    str(descriptor),
+                    str(manifest),
+                ]
+                process = subprocess.run(
+                    command, cwd=root, text=True, capture_output=True, check=False
+                )
+                return _reference_report(process, command, root, version)
         return run_reference_descriptor_validator(
             kind,
-            temporary,
+            descriptor,
             standard_root=standard_root,
             required=required,
         )
-    finally:
-        temporary.unlink(missing_ok=True)
 
 
 def validate_standard_descriptor_schema(
