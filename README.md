@@ -1,6 +1,6 @@
 # VAO CLI
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22133810.svg)](https://doi.org/10.5281/zenodo.22133810)
+[![VAO CLI 0.4.0](https://img.shields.io/badge/CLI-0.4.0-2C5F73.svg)](https://github.com/modavis-project/vao-cli/releases/tag/v0.4.0)
 [![VAO 0.6.0](https://img.shields.io/badge/VAO-0.6.0-2C5F73.svg)](https://doi.org/10.5281/zenodo.23287792)
 
 VAO CLI is a reference command-line client for the
@@ -19,14 +19,13 @@ claimed level separately.
 > delete Zenodo records. Its publication command only prepares a blocked local review
 > package.
 
-## Current source version
+## Current release
 
 | Component | Version |
 | --- | --- |
-| VAO CLI | 0.3.1 development source |
+| VAO CLI | [0.4.0](https://github.com/modavis-project/vao-cli/releases/tag/v0.4.0) |
 | Supported VAO versions | 0.4.0, 0.5.0, 0.6.0 |
 | Python | 3.11 or newer |
-| Software archive DOI | [10.5281/zenodo.22133810](https://doi.org/10.5281/zenodo.22133810) |
 
 Legacy VAO 0.3.3 manifests may be inspected with explicitly limited structural checks.
 No 0.3 draft is presented as a current standard or as later-version conformance.
@@ -75,13 +74,12 @@ Run `vao COMMAND --help` for the complete options of a command.
 ## Installation
 
 VAO CLI requires both the Python package and a trusted checkout of the released VAO
-Standard. Install the release wheel in a virtual environment and obtain the standard:
+Standard. Download the wheel from the [0.4.0 release](https://github.com/modavis-project/vao-cli/releases/tag/v0.4.0), then install it in a virtual environment:
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-git clone https://github.com/modavis-project/vao-cli.git
-python -m pip install ./vao-cli
+python -m pip install ./vao_cli-0.4.0-py3-none-any.whl
 
 git clone --branch v0.6.0 https://github.com/modavis-project/vao-standard.git
 export VAO_STANDARD_ROOT="$(cd vao-standard && pwd)"

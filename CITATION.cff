@@ -2,15 +2,15 @@ cff-version: 1.2.0
 message: "If you use VAO CLI, cite this software and the applicable VAO standard release."
 title: "VAO CLI"
 type: software
-version: "0.3.1"
-doi: "10.5281/zenodo.22133810"
+version: "0.4.0"
+date-released: 2026-11-19
 authors:
   - family-names: Ukolov
     given-names: Dominik
     orcid: "https://orcid.org/0000-0002-7904-3892"
     affiliation: "Digital Humanities (Image/Object), Friedrich Schiller University Jena; Research Group DIGITAL ORGANOLOGY, Leipzig University"
 repository-code: "https://github.com/modavis-project/vao-cli"
-url: "https://modavis-project.github.io/vao-cli/"
+url: "https://github.com/modavis-project/vao-cli/releases/tag/v0.4.0"
 license: Apache-2.0
 keywords:
   - virtual acoustic object

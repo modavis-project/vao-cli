@@ -3,15 +3,13 @@
 All notable changes to VAO CLI are recorded here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.4.0 — 2026-11-19
 
 - Validate VAO 0.6.0 manifests and carriers with the signed standard checkout.
 - Report each claimed MMIC 1.0.0 validation level, including inputs missing from a
   bootstrap or a custom carrier.
 - Verify and retrieve selected 0.6.0 realizations and retain their exact manifest
   bytes when writing a custom carrier.
-
-## 0.3.1 — Unreleased
 
 - Include the version-matched schema identifier in custom carrier descriptors.
   Without it, materialization could retrieve valid payloads but fail its final
@@ -20,7 +18,7 @@ All notable changes to VAO CLI are recorded here. The project follows
   conformance enabled, including exact preservation of the manifest bytes.
 - Update compatibility references to the published VAO Standard 0.5.0.
 
-## 0.3.0 — 2026-08-28
+## 0.3.0 — development snapshot, 2026-08-28
 
 - Adds VAO 0.5.0 candidate validation while retaining VAO 0.4.0 support.
 - Resolves a release-declared bootstrap carrier by default and a preservation closure

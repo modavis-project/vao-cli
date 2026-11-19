@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vao-cli"
-version = "0.3.1"
+version = "0.4.0"
 description = "Reference command-line client for resolving, validating, and selectively acquiring Virtual Acoustic Objects"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -52,7 +52,7 @@ Homepage = "https://modavis-project.github.io/vao-cli/"
 Documentation = "https://modavis-project.github.io/vao-cli/"
 Repository = "https://github.com/modavis-project/vao-cli"
 Issues = "https://github.com/modavis-project/vao-cli/issues"
-DOI = "https://doi.org/10.5281/zenodo.22133810"
+Release = "https://github.com/modavis-project/vao-cli/releases/tag/v0.4.0"
 Standard = "https://doi.org/10.5281/zenodo.23287792"
 
 [project.scripts]

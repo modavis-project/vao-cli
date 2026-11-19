@@ -3,6 +3,7 @@ name: Validate VAO CLI
 on:
   workflow_call:
   push:
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
 
